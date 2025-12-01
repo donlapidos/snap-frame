@@ -109,12 +109,13 @@
             transform-origin: center center;
         }
 
-        /* Fix video orientation for mobile devices */
-        @media (orientation: landscape) and (max-width: 1024px) {
-            #video {
-                /* Check if camera needs rotation correction */
-                transform: scaleX(-1); /* Mirror for front camera */
-            }
+        /* Mirror front camera */
+        #video {
+            transform: scaleX(-1);
+        }
+
+        .overlay-canvas {
+            transform: scaleX(-1);
         }
 
         .overlay-canvas {
@@ -524,21 +525,18 @@
                 // Small delay to ensure camera is released
                 await new Promise(resolve => setTimeout(resolve, 100));
 
-                // Request camera access with orientation support
+                // Request camera access with orientation-aware constraints
+                const isLandscape = window.matchMedia("(orientation: landscape)").matches;
+
                 const constraints = {
                     video: {
                         facingMode: 'user',
-                        width: { ideal: 1920 },
-                        height: { ideal: 1440 }
+                        // Request dimensions that match current orientation
+                        width: { ideal: isLandscape ? 1920 : 1080 },
+                        height: { ideal: isLandscape ? 1080 : 1920 },
+                        aspectRatio: { ideal: isLandscape ? 16/9 : 9/16 }
                     }
                 };
-
-                // For mobile devices, try to use environment camera if landscape
-                if (window.matchMedia("(orientation: landscape)").matches &&
-                    /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-                    // Still use front camera but with better settings
-                    constraints.video.aspectRatio = { ideal: 16/9 };
-                }
 
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
 
@@ -697,33 +695,10 @@
                     offsetY = -(drawHeight - dims.height) / 2;
                 }
 
-                // Get orientation angle to handle rotation
-                const angle = getOrientationAngle();
-                const needsRotation = angle !== 0;
-
-                // Save context state
+                // Mirror the video horizontally (to match preview)
                 ctx.save();
-
-                if (needsRotation) {
-                    // Translate to center, rotate, then translate back
-                    ctx.translate(dims.width / 2, dims.height / 2);
-
-                    // Handle different rotation angles
-                    if (angle === 180 || angle === -180) {
-                        ctx.rotate(Math.PI); // 180 degrees
-                    } else if (angle === 90 || angle === -270) {
-                        ctx.rotate(Math.PI / 2); // 90 degrees clockwise
-                    } else if (angle === -90 || angle === 270) {
-                        ctx.rotate(-Math.PI / 2); // 90 degrees counter-clockwise
-                    }
-
-                    ctx.translate(-dims.width / 2, -dims.height / 2);
-                }
-
-                // Draw video frame
-                ctx.drawImage(video, offsetX, offsetY, drawWidth, drawHeight);
-
-                // Restore context state
+                ctx.scale(-1, 1);
+                ctx.drawImage(video, -dims.width - offsetX, offsetY, drawWidth, drawHeight);
                 ctx.restore();
 
                 // 1. Draw gradient overlay (full background)
@@ -843,15 +818,28 @@
         document.getElementById('retake-btn').addEventListener('click', retakePhoto);
         document.getElementById('retry-btn').addEventListener('click', retryCamera);
 
-        // Handle window resize and orientation change for preview overlay
-        let resizeTimeout;
-        function handleOrientationChange() {
-            clearTimeout(resizeTimeout);
-            resizeTimeout = setTimeout(() => {
-                if (overlayImages.logo_rrc || overlayImages.logo_rrc_png) {
+        // Handle orientation change - restart camera with new constraints
+        let orientationTimeout;
+        async function handleOrientationChange() {
+            clearTimeout(orientationTimeout);
+            orientationTimeout = setTimeout(async () => {
+                // Only reinitialize if camera is already active
+                if (stream && stream.active) {
+                    console.log('Orientation changed - reinitializing camera');
+
+                    // Stop current stream
+                    stopExistingStreams();
+
+                    // Small delay to ensure clean restart
+                    await new Promise(resolve => setTimeout(resolve, 300));
+
+                    // Reinitialize camera with new orientation constraints
+                    await initCamera();
+                } else if (overlayImages.logo_rrc || overlayImages.logo_rrc_png) {
+                    // Just redraw overlay if camera not active
                     drawPreviewOverlay();
                 }
-            }, 250);
+            }, 500); // Longer delay to ensure orientation has settled
         }
 
         window.addEventListener('resize', handleOrientationChange);
