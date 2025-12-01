@@ -13,7 +13,7 @@
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #e6ebef;
             height: 100vh;
             display: flex;
             flex-direction: column;
@@ -22,19 +22,6 @@
             padding: 15px 10px;
             overflow: hidden;
             position: relative;
-        }
-
-        body::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background:
-                radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
-                radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
-            pointer-events: none;
         }
 
         .container {
@@ -58,10 +45,7 @@
         }
 
         h1 {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: #262d34;
             margin-bottom: 18px;
             font-size: 2rem;
             font-weight: 800;
@@ -121,7 +105,7 @@
         }
 
         #snap-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #21a0fb;
             color: white;
             border: none;
             width: 80px;
@@ -131,9 +115,9 @@
             font-weight: 700;
             cursor: pointer;
             box-shadow:
-                0 8px 25px rgba(102, 126, 234, 0.4),
+                0 8px 25px rgba(33, 160, 251, 0.4),
                 0 0 0 4px rgba(255, 255, 255, 1),
-                0 0 0 6px rgba(102, 126, 234, 0.3);
+                0 0 0 6px rgba(33, 160, 251, 0.3);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             margin: 18px auto 0;
             position: relative;
@@ -156,9 +140,9 @@
         #snap-btn:hover:not(:disabled) {
             transform: scale(1.08);
             box-shadow:
-                0 12px 35px rgba(102, 126, 234, 0.5),
+                0 12px 35px rgba(33, 160, 251, 0.5),
                 0 0 0 4px rgba(255, 255, 255, 1),
-                0 0 0 6px rgba(102, 126, 234, 0.4);
+                0 0 0 6px rgba(33, 160, 251, 0.4);
         }
 
         #snap-btn:active:not(:disabled) {
@@ -261,14 +245,14 @@
         }
 
         #download-btn {
-            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            background: #ff6c19;
             color: white;
-            box-shadow: 0 6px 20px rgba(17, 153, 142, 0.4);
+            box-shadow: 0 6px 20px rgba(255, 108, 25, 0.4);
         }
 
         #download-btn:hover {
             transform: translateY(-3px);
-            box-shadow: 0 10px 30px rgba(17, 153, 142, 0.5);
+            box-shadow: 0 10px 30px rgba(255, 108, 25, 0.5);
         }
 
         #download-btn:active {
@@ -276,14 +260,14 @@
         }
 
         #retake-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #21a0fb;
             color: white;
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 6px 20px rgba(33, 160, 251, 0.4);
         }
 
         #retake-btn:hover {
             transform: translateY(-3px);
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.5);
+            box-shadow: 0 10px 30px rgba(33, 160, 251, 0.5);
         }
 
         #retake-btn:active {
@@ -318,7 +302,7 @@
         }
 
         #retry-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #21a0fb;
             color: white;
             border: none;
             padding: 14px 32px;
@@ -327,13 +311,13 @@
             font-weight: 600;
             cursor: pointer;
             margin-top: 20px;
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 6px 20px rgba(33, 160, 251, 0.4);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         #retry-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+            box-shadow: 0 8px 25px rgba(33, 160, 251, 0.5);
         }
 
         #retry-btn:active {
@@ -448,7 +432,7 @@
         const ASSETS = {
             logo_rrc: 'assets/Asset 2.svg',
             logo_rrc_png: 'assets/Asset 2.png',
-            text_event: 'assets/annual gathering.svg',
+            text_event: 'assets/annual gathering final.svg',
             text_event_png: 'assets/Asset 3.png',
             box_3d: 'assets/Asset 4.svg',
             box_3d_png: 'assets/Asset 4 (1).png',
