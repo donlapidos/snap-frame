@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snap & Frame</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 15px 10px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .container {
+            max-width: 500px;
+            width: 100%;
+            max-height: 100vh;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
+            box-shadow:
+                0 20px 60px rgba(0, 0, 0, 0.3),
+                0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+            padding: 20px 25px 25px;
+            text-align: center;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        h1 {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 18px;
+            font-size: 2rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            flex-shrink: 0;
+        }
+
+        #camera-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .preview-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
+            background: #000;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow:
+                0 10px 40px rgba(0, 0, 0, 0.3),
+                0 0 0 1px rgba(255, 255, 255, 0.1);
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            align-items: center;
+        }
+
+        .preview-wrapper {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 9 / 16;
+            max-height: 100%;
+        }
+
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .overlay-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        #snap-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow:
+                0 8px 25px rgba(102, 126, 234, 0.4),
+                0 0 0 4px rgba(255, 255, 255, 1),
+                0 0 0 6px rgba(102, 126, 234, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            margin: 18px auto 0;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        #snap-btn::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            height: 90%;
+            border-radius: 50%;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, transparent 100%);
+            pointer-events: none;
+        }
+
+        #snap-btn:hover:not(:disabled) {
+            transform: scale(1.08);
+            box-shadow:
+                0 12px 35px rgba(102, 126, 234, 0.5),
+                0 0 0 4px rgba(255, 255, 255, 1),
+                0 0 0 6px rgba(102, 126, 234, 0.4);
+        }
+
+        #snap-btn:active:not(:disabled) {
+            transform: scale(0.98);
+        }
+
+        #snap-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .result-section {
+            display: none;
+            animation: fadeIn 0.4s ease;
+            flex: 1;
+            flex-direction: column;
+            min-height: 0;
+            overflow-y: auto;
+        }
+
+        .result-section.show {
+            display: flex;
+        }
+
+        .result-section h2 {
+            font-size: 1.4rem;
+            margin-bottom: 15px;
+            color: #333;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        #result-preview {
+            max-width: 100%;
+            width: auto;
+            height: auto;
+            max-height: 100%;
+            border-radius: 20px;
+            box-shadow:
+                0 10px 40px rgba(0, 0, 0, 0.3),
+                0 0 0 1px rgba(255, 255, 255, 0.1);
+            margin: 0 auto;
+            display: block;
+            object-fit: contain;
+            flex: 1;
+            min-height: 0;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 15px;
+            flex-shrink: 0;
+        }
+
+        #download-btn, #retake-btn {
+            border: none;
+            padding: 14px 32px;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            flex: 1;
+            min-width: 145px;
+            max-width: 200px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #download-btn::before, #retake-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        #download-btn:hover::before, #retake-btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        #download-btn {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            box-shadow: 0 6px 20px rgba(17, 153, 142, 0.4);
+        }
+
+        #download-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(17, 153, 142, 0.5);
+        }
+
+        #download-btn:active {
+            transform: translateY(-1px);
+        }
+
+        #retake-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        #retake-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.5);
+        }
+
+        #retake-btn:active {
+            transform: translateY(-1px);
+        }
+
+        .error-message {
+            display: none;
+            background: linear-gradient(135deg, #fff5f5 0%, #ffe5e5 100%);
+            border: 2px solid #fca5a5;
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 15px;
+            color: #dc2626;
+            box-shadow: 0 4px 15px rgba(220, 38, 38, 0.1);
+            flex-shrink: 0;
+        }
+
+        .error-message.show {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .error-message h2 {
+            color: #dc2626;
+            margin-bottom: 12px;
+            font-weight: 700;
+        }
+
+        .error-message p {
+            line-height: 1.6;
+        }
+
+        #retry-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        #retry-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+        }
+
+        #retry-btn:active {
+            transform: translateY(0);
+        }
+
+        .loading {
+            display: inline-block;
+            width: 22px;
+            height: 22px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.7s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Responsive improvements */
+        @media (max-width: 480px) {
+            .container {
+                padding: 18px 20px 22px;
+            }
+
+            h1 {
+                font-size: 1.8rem;
+                margin-bottom: 15px;
+            }
+
+            #snap-btn {
+                width: 70px;
+                height: 70px;
+                margin-top: 15px;
+            }
+
+            #download-btn, #retake-btn {
+                min-width: 130px;
+                padding: 12px 24px;
+                font-size: 0.95rem;
+            }
+
+            .button-group {
+                margin-top: 12px;
+            }
+        }
+
+        @media (max-height: 700px) {
+            h1 {
+                font-size: 1.7rem;
+                margin-bottom: 12px;
+            }
+
+            .container {
+                padding: 15px 20px 20px;
+            }
+
+            #snap-btn {
+                width: 70px;
+                height: 70px;
+                margin-top: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Snap & Frame</h1>
+
+        <div class="error-message" id="error-message">
+            <h2>We couldn't access your camera</h2>
+            <p>Please check browser permissions or try another device. Make sure you're using a modern browser (Chrome, Edge, Safari, or Firefox).</p>
+            <button id="retry-btn">Retry Camera Access</button>
+        </div>
+
+        <div id="camera-section">
+            <div class="preview-container">
+                <div class="preview-wrapper">
+                    <video id="video" autoplay playsinline muted></video>
+                    <canvas id="overlay-preview" class="overlay-canvas"></canvas>
+                </div>
+            </div>
+
+            <button id="snap-btn" disabled>
+                <span id="snap-text">Snap</span>
+                <span id="snap-loading" class="loading hidden"></span>
+            </button>
+        </div>
+
+        <div class="result-section" id="result-section">
+            <h2>Your Framed Photo</h2>
+            <img id="result-preview" alt="Your framed photo">
+            <div class="button-group">
+                <button id="retake-btn">Retake Photo</button>
+                <button id="download-btn">Download Photo</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const USE_SVG = true; // Set to false to use PNG overlays instead
+        const CANVAS_WIDTH = 1080;
+        const CANVAS_HEIGHT = 1920; // 9:16 aspect ratio (Instagram Story / Portrait)
+
+        // Asset paths
+        const ASSETS = {
+            logo_rrc: 'assets/Asset 2.svg',
+            logo_rrc_png: 'assets/Asset 2.png',
+            text_event: 'assets/annual gathering.svg',
+            text_event_png: 'assets/Asset 3.png',
+            box_3d: 'assets/Asset 4.svg',
+            box_3d_png: 'assets/Asset 4 (1).png',
+            gradient: 'assets/Asset 5.svg'
+        };
+
+        // DOM elements
+        const video = document.getElementById('video');
+        const snapBtn = document.getElementById('snap-btn');
+        const snapText = document.getElementById('snap-text');
+        const snapLoading = document.getElementById('snap-loading');
+        const cameraView = document.getElementById('camera-section');
+        const resultSection = document.getElementById('result-section');
+        const resultPreview = document.getElementById('result-preview');
+        const downloadBtn = document.getElementById('download-btn');
+        const errorMessage = document.getElementById('error-message');
+        const overlayPreview = document.getElementById('overlay-preview');
+
+        let stream = null;
+        let overlayImages = {};
+
+        // Stop any existing streams
+        function stopExistingStreams() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+            }
+        }
+
+        // Initialize camera
+        async function initCamera() {
+            try {
+                // Check if getUserMedia is supported
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error('getUserMedia not supported');
+                }
+
+                // Stop any existing streams first
+                stopExistingStreams();
+
+                // Small delay to ensure camera is released
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Request camera access - using the same approach as working Google AI Studio version
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'user',
+                        width: { ideal: 1920 },
+                        height: { ideal: 1440 }
+                    }
+                });
+
+                video.srcObject = stream;
+
+                // Wait for video metadata and let autoplay handle the rest
+                video.onloadedmetadata = () => {
+                    console.log('Video metadata loaded');
+                };
+
+                // Load overlay assets first
+                await loadOverlayAssets();
+
+                // Enable snap button
+                snapBtn.disabled = false;
+
+                // Draw preview overlay
+                drawPreviewOverlay();
+
+            } catch (error) {
+                console.error('Camera error:', error);
+
+                // More detailed error messages
+                let errorMsg = 'We couldn\'t access your camera. ';
+                if (error.name === 'NotReadableError') {
+                    errorMsg += 'The camera is currently in use by another application. Please close other apps using the camera and refresh this page.';
+                } else if (error.name === 'NotAllowedError') {
+                    errorMsg += 'Camera access was denied. Please check your browser permissions.';
+                } else if (error.name === 'NotFoundError') {
+                    errorMsg += 'No camera was found on your device.';
+                } else {
+                    errorMsg += error.message;
+                }
+
+                showError(errorMsg);
+            }
+        }
+
+        // Load overlay assets
+        async function loadOverlayAssets() {
+            const imagesToLoad = USE_SVG
+                ? ['logo_rrc', 'text_event', 'box_3d', 'gradient']
+                : ['logo_rrc_png', 'text_event_png', 'box_3d_png'];
+
+            const promises = imagesToLoad.map(key => {
+                return new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    img.onload = () => {
+                        overlayImages[key] = img;
+                        resolve();
+                    };
+                    img.onerror = reject;
+                    img.src = ASSETS[key];
+                });
+            });
+
+            await Promise.all(promises);
+        }
+
+        // Draw preview overlay on canvas
+        function drawPreviewOverlay() {
+            const canvas = overlayPreview;
+            const ctx = canvas.getContext('2d');
+
+            // Set canvas size to match container
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Calculate scaling based on reference dimensions (1080x1920)
+            const scale = canvas.width / CANVAS_WIDTH;
+
+            // 1. Draw gradient overlay (full background)
+            if (overlayImages.gradient || overlayImages.gradient_png) {
+                const gradImg = overlayImages.gradient || overlayImages.gradient_png;
+                ctx.globalAlpha = 0.8;
+                ctx.drawImage(gradImg, 0, 0, canvas.width, canvas.height);
+                ctx.globalAlpha = 1.0;
+            }
+
+            // 2. Draw logos at top (Asset 2 - contains both RRC and BEYOND logos)
+            if (overlayImages.logo_rrc || overlayImages.logo_rrc_png) {
+                const logoImg = overlayImages.logo_rrc || overlayImages.logo_rrc_png;
+                // Position at top center with proper sizing
+                const logoWidth = 350 * scale;
+                const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
+                const logoX = (canvas.width - logoWidth) / 2; // Center horizontally
+                const logoY = 100 * scale; // Lowered from 50 to 100
+                ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
+            }
+
+            // 3. Draw event text (bottom left - Asset 3)
+            if (overlayImages.text_event || overlayImages.text_event_png) {
+                const textImg = overlayImages.text_event || overlayImages.text_event_png;
+                const textWidth = 550 * scale; // Increased size
+                const textHeight = (textImg.height / textImg.width) * textWidth;
+                const textX = 80 * scale;
+                const textY = canvas.height - textHeight - (120 * scale);
+                ctx.drawImage(textImg, textX, textY, textWidth, textHeight);
+            }
+
+            // 4. Draw 3D box (bottom right - Asset 4)
+            if (overlayImages.box_3d || overlayImages.box_3d_png) {
+                const boxImg = overlayImages.box_3d || overlayImages.box_3d_png;
+                const boxWidth = 320 * scale; // Increased size significantly
+                const boxHeight = (boxImg.height / boxImg.width) * boxWidth;
+                const boxX = canvas.width - boxWidth - (80 * scale);
+                const boxY = canvas.height - boxHeight - (120 * scale);
+                ctx.drawImage(boxImg, boxX, boxY, boxWidth, boxHeight);
+            }
+        }
+
+        // Snap photo
+        async function snapPhoto() {
+            // Disable button during processing
+            snapBtn.disabled = true;
+            snapText.classList.add('hidden');
+            snapLoading.classList.remove('hidden');
+
+            try {
+                // Create canvas for final composition
+                const canvas = document.createElement('canvas');
+                canvas.width = CANVAS_WIDTH;
+                canvas.height = CANVAS_HEIGHT;
+                const ctx = canvas.getContext('2d');
+
+                // Calculate video dimensions to maintain aspect ratio
+                const videoAspect = video.videoWidth / video.videoHeight;
+                const canvasAspect = CANVAS_WIDTH / CANVAS_HEIGHT;
+
+                let drawWidth, drawHeight, offsetX, offsetY;
+
+                if (videoAspect > canvasAspect) {
+                    // Video is wider - fit to height
+                    drawHeight = CANVAS_HEIGHT;
+                    drawWidth = drawHeight * videoAspect;
+                    offsetX = -(drawWidth - CANVAS_WIDTH) / 2;
+                    offsetY = 0;
+                } else {
+                    // Video is taller - fit to width
+                    drawWidth = CANVAS_WIDTH;
+                    drawHeight = drawWidth / videoAspect;
+                    offsetX = 0;
+                    offsetY = -(drawHeight - CANVAS_HEIGHT) / 2;
+                }
+
+                // Draw video frame
+                ctx.drawImage(video, offsetX, offsetY, drawWidth, drawHeight);
+
+                // 1. Draw gradient overlay (full background)
+                if (overlayImages.gradient || overlayImages.gradient_png) {
+                    const gradImg = overlayImages.gradient || overlayImages.gradient_png;
+                    ctx.globalAlpha = 0.8;
+                    ctx.drawImage(gradImg, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                    ctx.globalAlpha = 1.0;
+                }
+
+                // 2. Draw logos at top center (Asset 2 - both RRC and BEYOND logos)
+                if (overlayImages.logo_rrc || overlayImages.logo_rrc_png) {
+                    const logoImg = overlayImages.logo_rrc || overlayImages.logo_rrc_png;
+                    const logoWidth = 350;
+                    const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
+                    const logoX = (CANVAS_WIDTH - logoWidth) / 2; // Center horizontally
+                    const logoY = 100; // Lowered from 50 to 100
+                    ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
+                }
+
+                // 3. Draw event text at bottom left (Asset 3)
+                if (overlayImages.text_event || overlayImages.text_event_png) {
+                    const textImg = overlayImages.text_event || overlayImages.text_event_png;
+                    const textWidth = 550; // Increased size
+                    const textHeight = (textImg.height / textImg.width) * textWidth;
+                    const textX = 80;
+                    const textY = CANVAS_HEIGHT - textHeight - 120;
+                    ctx.drawImage(textImg, textX, textY, textWidth, textHeight);
+                }
+
+                // 4. Draw 3D box at bottom right (Asset 4)
+                if (overlayImages.box_3d || overlayImages.box_3d_png) {
+                    const boxImg = overlayImages.box_3d || overlayImages.box_3d_png;
+                    const boxWidth = 320; // Increased size significantly
+                    const boxHeight = (boxImg.height / boxImg.width) * boxWidth;
+                    const boxX = CANVAS_WIDTH - boxWidth - 80;
+                    const boxY = CANVAS_HEIGHT - boxHeight - 120;
+                    ctx.drawImage(boxImg, boxX, boxY, boxWidth, boxHeight);
+                }
+
+                // Convert to data URL
+                const dataUrl = canvas.toDataURL('image/png');
+
+                // Show result
+                resultPreview.src = dataUrl;
+                resultSection.classList.add('show');
+                cameraView.classList.add('hidden');
+
+                // Smooth scroll to see result if needed
+                setTimeout(() => {
+                    resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }, 100);
+
+            } catch (error) {
+                console.error('Snap error:', error);
+                alert('Failed to capture photo. Please try again.');
+            } finally {
+                // Re-enable button
+                snapBtn.disabled = false;
+                snapText.classList.remove('hidden');
+                snapLoading.classList.add('hidden');
+            }
+        }
+
+        // Download photo
+        function downloadPhoto() {
+            const link = document.createElement('a');
+            link.download = 'framed-photo.png';
+            link.href = resultPreview.src;
+            link.click();
+        }
+
+        // Retake photo
+        function retakePhoto() {
+            // Hide result section and show camera view
+            resultSection.classList.remove('show');
+            cameraView.classList.remove('hidden');
+
+            // Clear the result preview
+            resultPreview.src = '';
+
+            // Re-enable snap button
+            snapBtn.disabled = false;
+
+            // Smooth scroll back to camera view
+            setTimeout(() => {
+                cameraView.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 100);
+        }
+
+        // Show error message
+        function showError(customMessage) {
+            if (customMessage) {
+                const errorText = errorMessage.querySelector('p');
+                if (errorText) {
+                    errorText.textContent = customMessage;
+                }
+            }
+            errorMessage.classList.add('show');
+            document.getElementById('camera-section').style.display = 'none';
+        }
+
+        // Retry camera access
+        function retryCamera() {
+            // Hide error and show camera section
+            errorMessage.classList.remove('show');
+            document.getElementById('camera-section').style.display = 'block';
+
+            // Reinitialize camera
+            initCamera();
+        }
+
+        // Event listeners
+        snapBtn.addEventListener('click', snapPhoto);
+        downloadBtn.addEventListener('click', downloadPhoto);
+        document.getElementById('retake-btn').addEventListener('click', retakePhoto);
+        document.getElementById('retry-btn').addEventListener('click', retryCamera);
+
+        // Handle window resize for preview overlay
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                if (overlayImages.logo_rrc || overlayImages.logo_rrc_png) {
+                    drawPreviewOverlay();
+                }
+            }, 250);
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            stopExistingStreams();
+        });
+
+        // Initialize on page load
+        window.addEventListener('load', initCamera);
+    </script>
+</body>
+</html>

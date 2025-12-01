@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Diagnostic Tool</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #00ff00;
+        }
+        .info { background: #2d2d2d; padding: 15px; margin: 10px 0; border-left: 3px solid #00ff00; }
+        .error { background: #2d2d2d; padding: 15px; margin: 10px 0; border-left: 3px solid #ff0000; color: #ff6b6b; }
+        button {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            margin: 10px 5px 10px 0;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover { background: #00dd00; }
+        video { border: 2px solid #00ff00; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Camera Diagnostic Tool</h1>
+
+    <div id="output"></div>
+
+    <button onclick="checkDevices()">1. List All Media Devices</button>
+    <button onclick="testBasicCamera()">2. Test Basic Camera Access</button>
+    <button onclick="testAlternativeCamera()">3. Test Alternative Method</button>
+    <button onclick="clearOutput()">Clear Output</button>
+
+    <div id="video-container"></div>
+
+    <script>
+        const output = document.getElementById('output');
+        const videoContainer = document.getElementById('video-container');
+
+        function log(message, isError = false) {
+            const div = document.createElement('div');
+            div.className = isError ? 'error' : 'info';
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+            output.appendChild(div);
+            console.log(message);
+        }
+
+        function clearOutput() {
+            output.innerHTML = '';
+            videoContainer.innerHTML = '';
+        }
+
+        async function checkDevices() {
+            log('📋 Checking available media devices...');
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+                log('❌ enumerateDevices not supported!', true);
+                return;
+            }
+
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+                log(`✅ Found ${devices.length} total devices`);
+                log(`📹 Found ${videoDevices.length} video input devices`);
+
+                videoDevices.forEach((device, index) => {
+                    log(`Camera ${index + 1}: ${device.label || 'Unknown Camera'} (ID: ${device.deviceId})`);
+                });
+
+                if (videoDevices.length === 0) {
+                    log('⚠️ No cameras detected!', true);
+                }
+
+            } catch (error) {
+                log(`❌ Error enumerating devices: ${error.name} - ${error.message}`, true);
+            }
+        }
+
+        async function testBasicCamera() {
+            log('🎥 Testing basic camera access...');
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: false
+                });
+
+                log('✅ Camera access granted!');
+                log(`Stream active: ${stream.active}`);
+                log(`Video tracks: ${stream.getVideoTracks().length}`);
+
+                const track = stream.getVideoTracks()[0];
+                const settings = track.getSettings();
+                log(`Camera: ${track.label}`);
+                log(`Resolution: ${settings.width}x${settings.height}`);
+                log(`Frame rate: ${settings.frameRate} fps`);
+
+                // Display video
+                const video = document.createElement('video');
+                video.autoplay = true;
+                video.srcObject = stream;
+                video.style.width = '640px';
+                videoContainer.innerHTML = '';
+                videoContainer.appendChild(video);
+
+                log('✅ Video should now be playing above');
+
+                // Stop after 10 seconds
+                setTimeout(() => {
+                    stream.getTracks().forEach(track => track.stop());
+                    log('🛑 Stream stopped (10 second test complete)');
+                }, 10000);
+
+            } catch (error) {
+                log(`❌ Camera access failed!`, true);
+                log(`Error type: ${error.name}`, true);
+                log(`Error message: ${error.message}`, true);
+
+                if (error.name === 'NotReadableError') {
+                    log('💡 NotReadableError means the camera is in use by another app!', true);
+                    log('💡 Close all other apps using the camera and try again.', true);
+                } else if (error.name === 'NotAllowedError') {
+                    log('💡 NotAllowedError means you denied permission or it\'s blocked in settings.', true);
+                } else if (error.name === 'NotFoundError') {
+                    log('💡 NotFoundError means no camera was found.', true);
+                }
+            }
+        }
+
+        async function testAlternativeCamera() {
+            log('🎥 Testing alternative camera access method (no constraints)...');
+
+            try {
+                // Try with minimal constraints
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {}
+                });
+
+                log('✅ Alternative method successful!');
+
+                const track = stream.getVideoTracks()[0];
+                log(`Camera: ${track.label}`);
+
+                // Display video
+                const video = document.createElement('video');
+                video.autoplay = true;
+                video.srcObject = stream;
+                video.style.width = '640px';
+                videoContainer.innerHTML = '';
+                videoContainer.appendChild(video);
+
+                log('✅ Video should now be playing above');
+
+                // Stop after 10 seconds
+                setTimeout(() => {
+                    stream.getTracks().forEach(track => track.stop());
+                    log('🛑 Stream stopped (10 second test complete)');
+                }, 10000);
+
+            } catch (error) {
+                log(`❌ Alternative method also failed!`, true);
+                log(`Error: ${error.name} - ${error.message}`, true);
+            }
+        }
+
+        // Auto-run device check on load
+        window.addEventListener('load', () => {
+            log('🚀 Camera Diagnostic Tool Ready');
+            log('Click the buttons above to run tests');
+            setTimeout(checkDevices, 500);
+        });
+    </script>
+</body>
+</html>
