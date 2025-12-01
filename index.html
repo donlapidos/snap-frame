@@ -106,6 +106,15 @@
             position: absolute;
             top: 0;
             left: 0;
+            transform-origin: center center;
+        }
+
+        /* Fix video orientation for mobile devices */
+        @media (orientation: landscape) and (max-width: 1024px) {
+            #video {
+                /* Check if camera needs rotation correction */
+                transform: scaleX(-1); /* Mirror for front camera */
+            }
         }
 
         .overlay-canvas {
@@ -440,6 +449,18 @@
         // Configuration
         const USE_SVG = true; // Set to false to use PNG overlays instead
 
+        // Get device orientation angle
+        function getOrientationAngle() {
+            if (screen.orientation && screen.orientation.angle !== undefined) {
+                return screen.orientation.angle;
+            }
+            // Fallback for older browsers
+            if (window.orientation !== undefined) {
+                return window.orientation;
+            }
+            return 0;
+        }
+
         // Dynamic canvas dimensions based on orientation
         function getCanvasDimensions() {
             const isLandscape = window.matchMedia("(orientation: landscape)").matches;
@@ -503,14 +524,23 @@
                 // Small delay to ensure camera is released
                 await new Promise(resolve => setTimeout(resolve, 100));
 
-                // Request camera access - using the same approach as working Google AI Studio version
-                stream = await navigator.mediaDevices.getUserMedia({
+                // Request camera access with orientation support
+                const constraints = {
                     video: {
                         facingMode: 'user',
                         width: { ideal: 1920 },
                         height: { ideal: 1440 }
                     }
-                });
+                };
+
+                // For mobile devices, try to use environment camera if landscape
+                if (window.matchMedia("(orientation: landscape)").matches &&
+                    /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                    // Still use front camera but with better settings
+                    constraints.video.aspectRatio = { ideal: 16/9 };
+                }
+
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
 
                 video.srcObject = stream;
 
@@ -667,8 +697,34 @@
                     offsetY = -(drawHeight - dims.height) / 2;
                 }
 
+                // Get orientation angle to handle rotation
+                const angle = getOrientationAngle();
+                const needsRotation = angle !== 0;
+
+                // Save context state
+                ctx.save();
+
+                if (needsRotation) {
+                    // Translate to center, rotate, then translate back
+                    ctx.translate(dims.width / 2, dims.height / 2);
+
+                    // Handle different rotation angles
+                    if (angle === 180 || angle === -180) {
+                        ctx.rotate(Math.PI); // 180 degrees
+                    } else if (angle === 90 || angle === -270) {
+                        ctx.rotate(Math.PI / 2); // 90 degrees clockwise
+                    } else if (angle === -90 || angle === 270) {
+                        ctx.rotate(-Math.PI / 2); // 90 degrees counter-clockwise
+                    }
+
+                    ctx.translate(-dims.width / 2, -dims.height / 2);
+                }
+
                 // Draw video frame
                 ctx.drawImage(video, offsetX, offsetY, drawWidth, drawHeight);
+
+                // Restore context state
+                ctx.restore();
 
                 // 1. Draw gradient overlay (full background)
                 if (overlayImages.gradient || overlayImages.gradient_png) {
