@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
     <title>Snap & Frame</title>
     <style>
         * {
@@ -493,7 +495,7 @@
 
                 // Wait for video metadata and let autoplay handle the rest
                 video.onloadedmetadata = () => {
-                    console.log('Video metadata loaded');
+                    // Video ready
                 };
 
                 // Load overlay assets first
@@ -506,7 +508,8 @@
                 drawPreviewOverlay();
 
             } catch (error) {
-                console.error('Camera error:', error);
+                // Log error for debugging (doesn't expose sensitive info)
+                if (error.name) console.error('Camera access error:', error.name);
 
                 // More detailed error messages
                 let errorMsg = 'We couldn\'t access your camera. ';
@@ -690,7 +693,8 @@
                 }, 100);
 
             } catch (error) {
-                console.error('Snap error:', error);
+                // Log error type only (no sensitive details)
+                if (error.name) console.error('Capture error:', error.name);
                 alert('Failed to capture photo. Please try again.');
             } finally {
                 // Re-enable button
