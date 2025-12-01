@@ -87,6 +87,18 @@
             max-height: 100%;
         }
 
+        /* Landscape orientation support */
+        @media (orientation: landscape) {
+            .preview-wrapper {
+                aspect-ratio: 16 / 9;
+                max-width: 100%;
+            }
+
+            .preview-container {
+                max-width: none;
+            }
+        }
+
         #video {
             width: 100%;
             height: 100%;
@@ -427,8 +439,17 @@
     <script>
         // Configuration
         const USE_SVG = true; // Set to false to use PNG overlays instead
-        const CANVAS_WIDTH = 1080;
-        const CANVAS_HEIGHT = 1920; // 9:16 aspect ratio (Instagram Story / Portrait)
+
+        // Dynamic canvas dimensions based on orientation
+        function getCanvasDimensions() {
+            const isLandscape = window.matchMedia("(orientation: landscape)").matches;
+            return isLandscape
+                ? { width: 1920, height: 1080 } // 16:9 landscape
+                : { width: 1080, height: 1920 }; // 9:16 portrait
+        }
+
+        let CANVAS_WIDTH = 1080;
+        let CANVAS_HEIGHT = 1920;
 
         // Asset paths
         const ASSETS = {
@@ -561,7 +582,12 @@
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Calculate scaling based on reference dimensions (1080x1920)
+            // Update canvas dimensions based on current orientation
+            const dims = getCanvasDimensions();
+            CANVAS_WIDTH = dims.width;
+            CANVAS_HEIGHT = dims.height;
+
+            // Calculate scaling based on current orientation
             const scale = canvas.width / CANVAS_WIDTH;
 
             // 1. Draw gradient overlay (full background)
@@ -612,30 +638,33 @@
             snapLoading.classList.remove('hidden');
 
             try {
+                // Get current orientation dimensions
+                const dims = getCanvasDimensions();
+
                 // Create canvas for final composition
                 const canvas = document.createElement('canvas');
-                canvas.width = CANVAS_WIDTH;
-                canvas.height = CANVAS_HEIGHT;
+                canvas.width = dims.width;
+                canvas.height = dims.height;
                 const ctx = canvas.getContext('2d');
 
                 // Calculate video dimensions to maintain aspect ratio
                 const videoAspect = video.videoWidth / video.videoHeight;
-                const canvasAspect = CANVAS_WIDTH / CANVAS_HEIGHT;
+                const canvasAspect = dims.width / dims.height;
 
                 let drawWidth, drawHeight, offsetX, offsetY;
 
                 if (videoAspect > canvasAspect) {
                     // Video is wider - fit to height
-                    drawHeight = CANVAS_HEIGHT;
+                    drawHeight = dims.height;
                     drawWidth = drawHeight * videoAspect;
-                    offsetX = -(drawWidth - CANVAS_WIDTH) / 2;
+                    offsetX = -(drawWidth - dims.width) / 2;
                     offsetY = 0;
                 } else {
                     // Video is taller - fit to width
-                    drawWidth = CANVAS_WIDTH;
+                    drawWidth = dims.width;
                     drawHeight = drawWidth / videoAspect;
                     offsetX = 0;
-                    offsetY = -(drawHeight - CANVAS_HEIGHT) / 2;
+                    offsetY = -(drawHeight - dims.height) / 2;
                 }
 
                 // Draw video frame
@@ -645,7 +674,7 @@
                 if (overlayImages.gradient || overlayImages.gradient_png) {
                     const gradImg = overlayImages.gradient || overlayImages.gradient_png;
                     ctx.globalAlpha = 0.8;
-                    ctx.drawImage(gradImg, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                    ctx.drawImage(gradImg, 0, 0, dims.width, dims.height);
                     ctx.globalAlpha = 1.0;
                 }
 
@@ -654,7 +683,7 @@
                     const logoImg = overlayImages.logo_rrc || overlayImages.logo_rrc_png;
                     const logoWidth = 350;
                     const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
-                    const logoX = (CANVAS_WIDTH - logoWidth) / 2; // Center horizontally
+                    const logoX = (dims.width - logoWidth) / 2; // Center horizontally
                     const logoY = 100; // Lowered from 50 to 100
                     ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
                 }
@@ -665,7 +694,7 @@
                     const textWidth = 550; // Increased size
                     const textHeight = (textImg.height / textImg.width) * textWidth;
                     const textX = 80;
-                    const textY = CANVAS_HEIGHT - textHeight - 120;
+                    const textY = dims.height - textHeight - 120;
                     ctx.drawImage(textImg, textX, textY, textWidth, textHeight);
                 }
 
@@ -674,8 +703,8 @@
                     const boxImg = overlayImages.box_3d || overlayImages.box_3d_png;
                     const boxWidth = 320; // Increased size significantly
                     const boxHeight = (boxImg.height / boxImg.width) * boxWidth;
-                    const boxX = CANVAS_WIDTH - boxWidth - 80;
-                    const boxY = CANVAS_HEIGHT - boxHeight - 120;
+                    const boxX = dims.width - boxWidth - 80;
+                    const boxY = dims.height - boxHeight - 120;
                     ctx.drawImage(boxImg, boxX, boxY, boxWidth, boxHeight);
                 }
 
@@ -758,16 +787,24 @@
         document.getElementById('retake-btn').addEventListener('click', retakePhoto);
         document.getElementById('retry-btn').addEventListener('click', retryCamera);
 
-        // Handle window resize for preview overlay
+        // Handle window resize and orientation change for preview overlay
         let resizeTimeout;
-        window.addEventListener('resize', () => {
+        function handleOrientationChange() {
             clearTimeout(resizeTimeout);
             resizeTimeout = setTimeout(() => {
                 if (overlayImages.logo_rrc || overlayImages.logo_rrc_png) {
                     drawPreviewOverlay();
                 }
             }, 250);
-        });
+        }
+
+        window.addEventListener('resize', handleOrientationChange);
+        window.addEventListener('orientationchange', handleOrientationChange);
+
+        // Also listen for media query changes (modern approach)
+        if (window.matchMedia) {
+            window.matchMedia('(orientation: portrait)').addEventListener('change', handleOrientationChange);
+        }
 
         // Cleanup on page unload
         window.addEventListener('beforeunload', () => {
