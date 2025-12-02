@@ -60,6 +60,9 @@ const resultPreview = document.getElementById('result-preview');
 const downloadBtn = document.getElementById('download-btn');
 const errorMessage = document.getElementById('error-message');
 const overlayPreview = document.getElementById('overlay-preview');
+const previewWrapper = document.querySelector('.preview-wrapper');
+const previewContainer = document.getElementById('preview-container');
+const fullscreenBtn = document.getElementById('fullscreen-btn');
 
 let stream = null;
 let overlayImages = {};
@@ -74,6 +77,15 @@ function stopExistingStreams() {
     if (video.srcObject) {
         video.srcObject.getTracks().forEach(track => track.stop());
         video.srcObject = null;
+    }
+}
+
+// Update preview wrapper aspect ratio based on actual video dimensions
+function updatePreviewAspectRatio() {
+    if (video.videoWidth > 0 && video.videoHeight > 0) {
+        const aspectRatio = video.videoWidth + ' / ' + video.videoHeight;
+        previewWrapper.style.aspectRatio = aspectRatio;
+        console.log('Updated preview aspect ratio to:', aspectRatio);
     }
 }
 
@@ -123,6 +135,9 @@ async function initCamera() {
                 };
             });
         }
+
+        // Update preview aspect ratio to match actual video
+        updatePreviewAspectRatio();
 
         // Load overlay assets
         await loadOverlayAssets();
@@ -417,18 +432,52 @@ function retryCamera() {
     initCamera();
 }
 
+// Toggle fullscreen preview
+function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+        // Enter fullscreen
+        if (previewContainer.requestFullscreen) {
+            previewContainer.requestFullscreen();
+        } else if (previewContainer.webkitRequestFullscreen) {
+            // Safari
+            previewContainer.webkitRequestFullscreen();
+        } else if (previewContainer.mozRequestFullScreen) {
+            // Firefox
+            previewContainer.mozRequestFullScreen();
+        } else if (previewContainer.msRequestFullscreen) {
+            // IE/Edge
+            previewContainer.msRequestFullscreen();
+        }
+    } else {
+        // Exit fullscreen
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+            document.mozCancelFullScreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+        }
+    }
+}
+
 // Event listeners
 snapBtn.addEventListener('click', snapPhoto);
 downloadBtn.addEventListener('click', downloadPhoto);
 document.getElementById('retake-btn').addEventListener('click', retakePhoto);
 document.getElementById('retry-btn').addEventListener('click', retryCamera);
+fullscreenBtn.addEventListener('click', toggleFullscreen);
 
-// Handle orientation change - just redraw overlays, no need to restart stream
+// Handle orientation change - update preview aspect ratio and redraw overlays
 let orientationTimeout;
 async function handleOrientationChange() {
     clearTimeout(orientationTimeout);
     orientationTimeout = setTimeout(() => {
-        // Just redraw the overlay with new dimensions
+        // Update preview aspect ratio to match video
+        updatePreviewAspectRatio();
+
+        // Redraw the overlay with new dimensions
         // Video stream automatically adjusts to device rotation
         if (overlayImages.logo_rrc || overlayImages.logo_rrc_png) {
             drawPreviewOverlay();
