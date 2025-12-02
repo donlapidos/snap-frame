@@ -1,0 +1,472 @@
+// Configuration
+const USE_SVG = true; // Set to false to use PNG overlays instead
+
+// Get device orientation angle
+function getOrientationAngle() {
+    if (screen.orientation && screen.orientation.angle !== undefined) {
+        return screen.orientation.angle;
+    }
+    // Fallback for older browsers
+    if (window.orientation !== undefined) {
+        return window.orientation;
+    }
+    return 0;
+}
+
+// Dynamic canvas dimensions based on video aspect ratio
+function getCanvasDimensions() {
+    // Use actual video dimensions if available
+    if (video.videoWidth > 0 && video.videoHeight > 0) {
+        const aspectRatio = video.videoWidth / video.videoHeight;
+        // Determine orientation based on video aspect ratio
+        if (aspectRatio > 1) {
+            // Landscape video
+            return { width: 1920, height: 1080 };
+        } else {
+            // Portrait video
+            return { width: 1080, height: 1920 };
+        }
+    }
+    // Fallback to matchMedia only if video not loaded yet
+    const isLandscape = window.matchMedia("(orientation: landscape)").matches;
+    return isLandscape
+        ? { width: 1920, height: 1080 }
+        : { width: 1080, height: 1920 };
+}
+
+let CANVAS_WIDTH = 1080;
+let CANVAS_HEIGHT = 1920;
+
+// Asset paths
+const ASSETS = {
+    logo_rrc: 'assets/Asset 2.svg',
+    logo_rrc_png: 'assets/Asset 2.png',
+    text_event: 'assets/annual gathering final.svg',
+    text_event_png: 'assets/Asset 3.png',
+    box_3d: 'assets/Asset 4.svg',
+    box_3d_png: 'assets/Asset 4 (1).png',
+    gradient: 'assets/Asset 5.svg',
+    gradient_png: 'assets/Asset 5.png' // PNG fallback for gradient
+};
+
+// DOM elements
+const video = document.getElementById('video');
+const snapBtn = document.getElementById('snap-btn');
+const snapText = document.getElementById('snap-text');
+const snapLoading = document.getElementById('snap-loading');
+const cameraView = document.getElementById('camera-section');
+const resultSection = document.getElementById('result-section');
+const resultPreview = document.getElementById('result-preview');
+const downloadBtn = document.getElementById('download-btn');
+const errorMessage = document.getElementById('error-message');
+const overlayPreview = document.getElementById('overlay-preview');
+
+let stream = null;
+let overlayImages = {};
+let currentPhotoURL = null; // Store current photo URL for cleanup
+
+// Stop any existing streams
+function stopExistingStreams() {
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+    }
+    if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+    }
+}
+
+// Initialize camera
+async function initCamera() {
+    try {
+        // Check if getUserMedia is supported
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('getUserMedia not supported');
+        }
+
+        // Stop any existing streams first
+        stopExistingStreams();
+
+        // Small delay to ensure camera is released
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Request camera access with orientation-aware constraints
+        const isLandscape = window.matchMedia("(orientation: landscape)").matches;
+
+        const constraints = {
+            video: {
+                facingMode: 'user',
+                // Request dimensions that match current orientation
+                width: { ideal: isLandscape ? 1920 : 1080 },
+                height: { ideal: isLandscape ? 1080 : 1920 },
+                aspectRatio: { ideal: isLandscape ? 16/9 : 9/16 }
+            }
+        };
+
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+        video.srcObject = stream;
+
+        // Wait for video metadata to be fully loaded
+        await new Promise((resolve) => {
+            video.onloadedmetadata = () => {
+                resolve();
+            };
+        });
+
+        // Wait for actual video dimensions to be available
+        if (video.videoWidth === 0 || video.videoHeight === 0) {
+            await new Promise((resolve) => {
+                video.onloadeddata = () => {
+                    resolve();
+                };
+            });
+        }
+
+        // Load overlay assets
+        await loadOverlayAssets();
+
+        // Enable snap button only after everything is ready
+        snapBtn.disabled = false;
+
+        // Draw preview overlay
+        drawPreviewOverlay();
+
+    } catch (error) {
+        // Log error for debugging (doesn't expose sensitive info)
+        if (error.name) console.error('Camera access error:', error.name);
+
+        // More detailed error messages
+        let errorMsg = 'We couldn\'t access your camera. ';
+        if (error.name === 'NotReadableError') {
+            errorMsg += 'The camera is currently in use by another application. Please close other apps using the camera and refresh this page.';
+        } else if (error.name === 'NotAllowedError') {
+            errorMsg += 'Camera access was denied. Please check your browser permissions.';
+        } else if (error.name === 'NotFoundError') {
+            errorMsg += 'No camera was found on your device.';
+        } else {
+            errorMsg += error.message;
+        }
+
+        showError(errorMsg);
+    }
+}
+
+// Load overlay assets
+async function loadOverlayAssets() {
+    const imagesToLoad = USE_SVG
+        ? ['logo_rrc', 'text_event', 'box_3d', 'gradient']
+        : ['logo_rrc_png', 'text_event_png', 'box_3d_png', 'gradient_png'];
+
+    const promises = imagesToLoad.map(key => {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                overlayImages[key] = img;
+                resolve();
+            };
+            img.onerror = (error) => {
+                console.warn(`Failed to load ${key}:`, ASSETS[key]);
+                // Don't reject - allow app to work with missing assets
+                resolve();
+            };
+            img.src = ASSETS[key];
+        });
+    });
+
+    await Promise.all(promises);
+}
+
+// Draw preview overlay on canvas
+function drawPreviewOverlay() {
+    const canvas = overlayPreview;
+    const ctx = canvas.getContext('2d');
+
+    // Set canvas size to match container
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Update canvas dimensions based on current orientation
+    const dims = getCanvasDimensions();
+    CANVAS_WIDTH = dims.width;
+    CANVAS_HEIGHT = dims.height;
+
+    // Calculate scaling based on current orientation
+    const scale = canvas.width / CANVAS_WIDTH;
+
+    // 1. Draw gradient overlay (full background)
+    if (overlayImages.gradient || overlayImages.gradient_png) {
+        const gradImg = overlayImages.gradient || overlayImages.gradient_png;
+        ctx.globalAlpha = 0.8;
+        ctx.drawImage(gradImg, 0, 0, canvas.width, canvas.height);
+        ctx.globalAlpha = 1.0;
+    }
+
+    // 2. Draw logos at top (Asset 2 - contains both RRC and BEYOND logos)
+    if (overlayImages.logo_rrc || overlayImages.logo_rrc_png) {
+        const logoImg = overlayImages.logo_rrc || overlayImages.logo_rrc_png;
+        // Position at top center with proper sizing
+        const logoWidth = 350 * scale;
+        const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
+        const logoX = (canvas.width - logoWidth) / 2; // Center horizontally
+        const logoY = 100 * scale; // Lowered from 50 to 100
+        ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
+    }
+
+    // 3. Draw event text (bottom left - Asset 3)
+    if (overlayImages.text_event || overlayImages.text_event_png) {
+        const textImg = overlayImages.text_event || overlayImages.text_event_png;
+        const textWidth = 550 * scale; // Increased size
+        const textHeight = (textImg.height / textImg.width) * textWidth;
+        const textX = 80 * scale;
+        const textY = canvas.height - textHeight - (120 * scale);
+        ctx.drawImage(textImg, textX, textY, textWidth, textHeight);
+    }
+
+    // 4. Draw 3D box (bottom right - Asset 4)
+    if (overlayImages.box_3d || overlayImages.box_3d_png) {
+        const boxImg = overlayImages.box_3d || overlayImages.box_3d_png;
+        const boxWidth = 320 * scale; // Increased size significantly
+        const boxHeight = (boxImg.height / boxImg.width) * boxWidth;
+        const boxX = canvas.width - boxWidth - (80 * scale);
+        const boxY = canvas.height - boxHeight - (120 * scale);
+        ctx.drawImage(boxImg, boxX, boxY, boxWidth, boxHeight);
+    }
+}
+
+// Snap photo
+async function snapPhoto() {
+    // Disable button during processing
+    snapBtn.disabled = true;
+    snapText.classList.add('hidden');
+    snapLoading.classList.remove('hidden');
+
+    try {
+        // Ensure video has valid dimensions
+        if (video.videoWidth === 0 || video.videoHeight === 0) {
+            // Wait for loadeddata event if dimensions not ready yet
+            await new Promise((resolve) => {
+                video.addEventListener('loadeddata', resolve, { once: true });
+            });
+        }
+
+        // Get current orientation dimensions
+        const dims = getCanvasDimensions();
+
+        // Create canvas for final composition
+        const canvas = document.createElement('canvas');
+        canvas.width = dims.width;
+        canvas.height = dims.height;
+        const ctx = canvas.getContext('2d');
+
+        // Calculate video dimensions to maintain aspect ratio
+        const videoAspect = video.videoWidth / video.videoHeight;
+        const canvasAspect = dims.width / dims.height;
+
+        let drawWidth, drawHeight, offsetX, offsetY;
+
+        if (videoAspect > canvasAspect) {
+            // Video is wider - fit to height
+            drawHeight = dims.height;
+            drawWidth = drawHeight * videoAspect;
+            offsetX = -(drawWidth - dims.width) / 2;
+            offsetY = 0;
+        } else {
+            // Video is taller - fit to width
+            drawWidth = dims.width;
+            drawHeight = drawWidth / videoAspect;
+            offsetX = 0;
+            offsetY = -(drawHeight - dims.height) / 2;
+        }
+
+        // Mirror the video horizontally (to match preview)
+        // Translate first, then scale, so offsets work correctly even when letterboxed
+        ctx.save();
+        ctx.translate(dims.width, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, offsetX, offsetY, drawWidth, drawHeight);
+        ctx.restore();
+
+        // 1. Draw gradient overlay (full background)
+        if (overlayImages.gradient || overlayImages.gradient_png) {
+            const gradImg = overlayImages.gradient || overlayImages.gradient_png;
+            ctx.globalAlpha = 0.8;
+            ctx.drawImage(gradImg, 0, 0, dims.width, dims.height);
+            ctx.globalAlpha = 1.0;
+        }
+
+        // 2. Draw logos at top center (Asset 2 - both RRC and BEYOND logos)
+        if (overlayImages.logo_rrc || overlayImages.logo_rrc_png) {
+            const logoImg = overlayImages.logo_rrc || overlayImages.logo_rrc_png;
+            const logoWidth = 350;
+            const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
+            const logoX = (dims.width - logoWidth) / 2; // Center horizontally
+            const logoY = 100; // Lowered from 50 to 100
+            ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
+        }
+
+        // 3. Draw event text at bottom left (Asset 3)
+        if (overlayImages.text_event || overlayImages.text_event_png) {
+            const textImg = overlayImages.text_event || overlayImages.text_event_png;
+            const textWidth = 550; // Increased size
+            const textHeight = (textImg.height / textImg.width) * textWidth;
+            const textX = 80;
+            const textY = dims.height - textHeight - 120;
+            ctx.drawImage(textImg, textX, textY, textWidth, textHeight);
+        }
+
+        // 4. Draw 3D box at bottom right (Asset 4)
+        if (overlayImages.box_3d || overlayImages.box_3d_png) {
+            const boxImg = overlayImages.box_3d || overlayImages.box_3d_png;
+            const boxWidth = 320; // Increased size significantly
+            const boxHeight = (boxImg.height / boxImg.width) * boxWidth;
+            const boxX = dims.width - boxWidth - 80;
+            const boxY = dims.height - boxHeight - 120;
+            ctx.drawImage(boxImg, boxX, boxY, boxWidth, boxHeight);
+        }
+
+        // Convert to blob for better memory efficiency
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+
+        // Revoke previous photo URL if exists
+        if (currentPhotoURL) {
+            URL.revokeObjectURL(currentPhotoURL);
+        }
+
+        // Create object URL for the blob
+        currentPhotoURL = URL.createObjectURL(blob);
+
+        // Show result
+        resultPreview.src = currentPhotoURL;
+        resultSection.classList.add('show');
+        cameraView.classList.add('hidden');
+
+        // Smooth scroll to see result if needed
+        setTimeout(() => {
+            resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 100);
+
+    } catch (error) {
+        // Log error type only (no sensitive details)
+        if (error.name) console.error('Capture error:', error.name);
+        alert('Failed to capture photo. Please try again.');
+    } finally {
+        // Re-enable button
+        snapBtn.disabled = false;
+        snapText.classList.remove('hidden');
+        snapLoading.classList.add('hidden');
+    }
+}
+
+// Download photo
+function downloadPhoto() {
+    const link = document.createElement('a');
+    link.download = 'framed-photo.png';
+    link.href = resultPreview.src;
+    link.click();
+}
+
+// Retake photo
+function retakePhoto() {
+    // Revoke object URL to free memory
+    if (currentPhotoURL) {
+        URL.revokeObjectURL(currentPhotoURL);
+        currentPhotoURL = null;
+    }
+
+    // Hide result section and show camera view
+    resultSection.classList.remove('show');
+    cameraView.classList.remove('hidden');
+
+    // Clear the result preview
+    resultPreview.src = '';
+
+    // Re-enable snap button
+    snapBtn.disabled = false;
+
+    // Smooth scroll back to camera view
+    setTimeout(() => {
+        cameraView.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 100);
+}
+
+// Show error message
+function showError(customMessage) {
+    if (customMessage) {
+        const errorText = errorMessage.querySelector('p');
+        if (errorText) {
+            errorText.textContent = customMessage;
+        }
+    }
+    errorMessage.classList.add('show');
+    document.getElementById('camera-section').style.display = 'none';
+}
+
+// Retry camera access
+function retryCamera() {
+    // Hide error and show camera section
+    errorMessage.classList.remove('show');
+    document.getElementById('camera-section').style.display = 'block';
+
+    // Reinitialize camera
+    initCamera();
+}
+
+// Event listeners
+snapBtn.addEventListener('click', snapPhoto);
+downloadBtn.addEventListener('click', downloadPhoto);
+document.getElementById('retake-btn').addEventListener('click', retakePhoto);
+document.getElementById('retry-btn').addEventListener('click', retryCamera);
+
+// Handle orientation change - just redraw overlays, no need to restart stream
+let orientationTimeout;
+async function handleOrientationChange() {
+    clearTimeout(orientationTimeout);
+    orientationTimeout = setTimeout(() => {
+        // Just redraw the overlay with new dimensions
+        // Video stream automatically adjusts to device rotation
+        if (overlayImages.logo_rrc || overlayImages.logo_rrc_png) {
+            drawPreviewOverlay();
+        }
+    }, 300); // Delay to ensure orientation has settled
+}
+
+window.addEventListener('resize', handleOrientationChange);
+window.addEventListener('orientationchange', handleOrientationChange);
+
+// Also listen for media query changes (with cross-browser support)
+if (window.matchMedia) {
+    const orientationMQ = window.matchMedia('(orientation: portrait)');
+    // Use addEventListener if available (modern browsers), otherwise addListener (Safari/older browsers)
+    if (orientationMQ.addEventListener) {
+        orientationMQ.addEventListener('change', handleOrientationChange);
+    } else if (orientationMQ.addListener) {
+        orientationMQ.addListener(handleOrientationChange);
+    }
+}
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+    stopExistingStreams();
+    // Revoke photo URL if exists
+    if (currentPhotoURL) {
+        URL.revokeObjectURL(currentPhotoURL);
+    }
+    // Clean up matchMedia listener
+    if (window.matchMedia) {
+        const orientationMQ = window.matchMedia('(orientation: portrait)');
+        if (orientationMQ.removeEventListener) {
+            orientationMQ.removeEventListener('change', handleOrientationChange);
+        } else if (orientationMQ.removeListener) {
+            orientationMQ.removeListener(handleOrientationChange);
+        }
+    }
+});
+
+// Initialize on page load
+window.addEventListener('load', initCamera);

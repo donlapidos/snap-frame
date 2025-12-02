@@ -17,3 +17,10 @@ __pycache__/
 
 # Node modules (if any)
 node_modules/
+
+# Build output
+dist/
+
+# Wrangler
+.wrangler/
+.dev.vars
