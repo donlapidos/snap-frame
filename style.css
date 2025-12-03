@@ -18,7 +18,7 @@ body {
 }
 
 .container {
-    max-width: 500px;
+    max-width: min(960px, 95vw);
     width: 100%;
     /* Removed max-height: 100vh to allow container to grow and scroll */
     background: rgba(255, 255, 255, 0.98);
@@ -57,7 +57,8 @@ h1 {
 .preview-container {
     position: relative;
     width: 100%;
-    max-width: 400px;
+    max-width: 100%;
+    max-height: 70vh;
     margin: 0 auto;
     background: #000;
     border-radius: 20px;
@@ -398,6 +399,11 @@ h1 {
 @media (max-width: 480px) {
     .container {
         padding: 18px 20px 22px;
+        max-width: 98vw;
+    }
+
+    .preview-container {
+        max-height: 75vh;
     }
 
     h1 {
