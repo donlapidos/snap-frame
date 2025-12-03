@@ -11,22 +11,22 @@ body {
     display: flex;
     justify-content: center;
     align-items: stretch;
-    padding: clamp(8px, 2vw, 40px);
-    position: relative;
+    padding: 0;
+    margin: 0;
 }
 
 .container {
-    width: min(1200px, 100%);
-    min-height: calc(100vh - clamp(16px, 4vw, 80px));
+    width: 100%;
+    min-height: 100vh;
     background: rgba(255, 255, 255, 0.98);
     backdrop-filter: blur(10px);
-    border-radius: 28px;
+    border-radius: 0;
     box-shadow:
-        0 20px 60px rgba(0, 0, 0, 0.3),
-        0 0 0 1px rgba(255, 255, 255, 0.1) inset;
-    padding: clamp(20px, 3vw, 48px);
+        0 10px 40px rgba(0, 0, 0, 0.2),
+        0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+    padding: clamp(20px, 5vw, 64px);
     text-align: center;
-    margin: 0 auto;
+    margin: 0;
     position: relative;
     z-index: 1;
     display: flex;
@@ -48,14 +48,13 @@ h1 {
     flex-direction: column;
     gap: clamp(16px, 2vh, 32px);
     min-height: 0;
-    overflow: hidden;
 }
 
 .preview-container {
     position: relative;
     width: 100%;
     max-width: 100%;
-    height: 100%;
+    height: calc(100vh - clamp(180px, 25vh, 280px));
     margin: 0 auto;
     background: #000;
     border-radius: 20px;
@@ -69,7 +68,7 @@ h1 {
     align-items: center;
 }
 
-.fullscreen-btn, .switch-camera-btn {
+.fullscreen-btn {
     position: absolute;
     top: 10px;
     z-index: 10;
@@ -86,23 +85,16 @@ h1 {
     justify-content: center;
     transition: all 0.2s ease;
     backdrop-filter: blur(10px);
-}
-
-.fullscreen-btn {
     right: 10px;
 }
 
-.switch-camera-btn {
-    right: 60px; /* Position to the left of fullscreen button */
-}
-
-.fullscreen-btn:hover, .switch-camera-btn:hover {
+.fullscreen-btn:hover {
     background: rgba(33, 160, 251, 0.8);
     border-color: rgba(255, 255, 255, 0.6);
     transform: scale(1.05);
 }
 
-.fullscreen-btn:active, .switch-camera-btn:active {
+.fullscreen-btn:active {
     transform: scale(0.95);
 }
 
@@ -397,21 +389,15 @@ h1 {
 
 /* Responsive improvements */
 @media (max-width: 480px) {
-    body {
-        padding: 8px;
-    }
-
     .container {
-        padding: 15px 12px 20px;
-        max-width: 100vw;
-        border-radius: 0;
-        min-height: 100vh;
+        padding: 18px 16px 24px;
     }
 
     .preview-container {
         width: 100%;
         max-width: 100vw;
         border-radius: 12px;
+        height: calc(100vh - 220px);
     }
 
     h1 {
@@ -443,8 +429,7 @@ h1 {
     }
 
     .container {
-        padding: 15px 20px 20px;
-        min-height: 100vh;
+        padding: 15px 20px 24px;
     }
 
     #snap-btn {

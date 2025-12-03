@@ -62,13 +62,10 @@ const overlayPreview = document.getElementById('overlay-preview');
 const previewWrapper = document.querySelector('.preview-wrapper');
 const previewContainer = document.getElementById('preview-container');
 const fullscreenBtn = document.getElementById('fullscreen-btn');
-const switchCameraBtn = document.getElementById('switch-camera-btn');
 
 let stream = null;
 let overlayImages = {};
 let currentPhotoURL = null; // Store current photo URL for cleanup
-let availableCameras = []; // Store available video input devices
-let currentCameraIndex = 0; // Track current camera
 let shouldMirrorCamera = true; // Track if current camera should be mirrored (true for front camera)
 
 // Stop any existing streams
@@ -120,34 +117,17 @@ function updateCameraMirrorState() {
 
     const settings = videoTrack.getSettings();
     const facingMode = settings.facingMode;
-    const trackLabel = videoTrack.label.toLowerCase();
+    const trackLabel = (videoTrack.label || '').toLowerCase();
 
-    // Determine if camera should be mirrored
-    if (facingMode === 'user') {
-        // Explicit front camera
-        shouldMirrorCamera = true;
-    } else if (facingMode === 'environment') {
-        // Explicit rear camera
+    // Default to mirrored (front camera experience)
+    shouldMirrorCamera = true;
+
+    // Explicit environment/back cameras should not mirror
+    if (facingMode === 'environment' ||
+        trackLabel.includes('back') ||
+        trackLabel.includes('rear') ||
+        trackLabel.includes('environment')) {
         shouldMirrorCamera = false;
-    } else {
-        // facingMode absent (common on desktop after deviceId switch)
-        // Check label for hints first
-        if (trackLabel.includes('front') || trackLabel.includes('user')) {
-            shouldMirrorCamera = true;
-        } else if (trackLabel.includes('back') || trackLabel.includes('rear') || trackLabel.includes('environment')) {
-            shouldMirrorCamera = false;
-        } else {
-            // No clear indication from facingMode or label
-            // Default to mirroring if only one camera (likely built-in front camera)
-            // Otherwise default to mirroring unless multiple cameras suggest otherwise
-            if (availableCameras.length === 1) {
-                shouldMirrorCamera = true; // Single camera = likely built-in front camera
-            } else {
-                // Multiple cameras with ambiguous labels - default to mirroring
-                // (safer assumption for built-in cameras; external cameras are less common)
-                shouldMirrorCamera = true;
-            }
-        }
     }
 
     // Toggle CSS class for video mirroring
@@ -157,38 +137,7 @@ function updateCameraMirrorState() {
         video.classList.remove('mirrored');
     }
 
-    console.log('Camera facing mode:', facingMode, 'Label:', trackLabel, 'Count:', availableCameras.length, '- Mirror:', shouldMirrorCamera);
-}
-
-// Enumerate available cameras
-async function enumerateCameras() {
-    try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        availableCameras = devices.filter(device => device.kind === 'videoinput');
-
-        // Show switch camera button if multiple cameras available
-        if (availableCameras.length > 1) {
-            switchCameraBtn.classList.remove('hidden');
-        } else {
-            switchCameraBtn.classList.add('hidden');
-        }
-
-        return availableCameras;
-    } catch (error) {
-        console.error('Error enumerating cameras:', error);
-        return [];
-    }
-}
-
-// Switch to next available camera
-async function switchCamera() {
-    if (availableCameras.length <= 1) return;
-
-    // Move to next camera
-    currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
-
-    // Reinitialize camera with new device
-    await initCamera();
+    console.log('Camera facing mode:', facingMode, 'Label:', trackLabel, '- Mirror:', shouldMirrorCamera);
 }
 
 // Initialize camera
@@ -214,10 +163,7 @@ async function initCamera() {
 
         const constraints = {
             video: {
-                // Use specific device if available, otherwise use facingMode
-                ...(availableCameras.length > 0 && availableCameras[currentCameraIndex]
-                    ? { deviceId: { exact: availableCameras[currentCameraIndex].deviceId } }
-                    : { facingMode: 'user' }),
+                facingMode: 'user',
                 // Enforce max dimensions to prevent GPU texture failures on mobile
                 width: { ideal: isLandscape ? 1920 : 1080, max: MAX_DIMENSION },
                 height: { ideal: isLandscape ? 1080 : 1920, max: MAX_DIMENSION },
@@ -226,20 +172,6 @@ async function initCamera() {
         };
 
         stream = await navigator.mediaDevices.getUserMedia(constraints);
-
-        // Enumerate cameras AFTER permission is granted
-        await enumerateCameras();
-
-        // Align currentCameraIndex with the actual active device
-        const activeTrack = stream.getVideoTracks()[0];
-        if (activeTrack && availableCameras.length > 0) {
-            const activeDeviceId = activeTrack.getSettings().deviceId;
-            const matchingIndex = availableCameras.findIndex(cam => cam.deviceId === activeDeviceId);
-            if (matchingIndex !== -1) {
-                currentCameraIndex = matchingIndex;
-                console.log('Aligned camera index to active device:', currentCameraIndex);
-            }
-        }
 
         video.srcObject = stream;
 
@@ -584,7 +516,6 @@ downloadBtn.addEventListener('click', downloadPhoto);
 document.getElementById('retake-btn').addEventListener('click', retakePhoto);
 document.getElementById('retry-btn').addEventListener('click', retryCamera);
 fullscreenBtn.addEventListener('click', toggleFullscreen);
-switchCameraBtn.addEventListener('click', switchCamera);
 
 // Handle orientation change - update preview aspect ratio and redraw overlays
 let orientationTimeout;
