@@ -634,5 +634,15 @@ window.addEventListener('beforeunload', () => {
     }
 });
 
+// Set initial aspect ratio based on device orientation before camera loads
+// This prevents the preview from jumping between portrait/landscape on load
+function setInitialAspectRatio() {
+    const isDevicePortrait = window.matchMedia('(orientation: portrait)').matches;
+    // Set initial aspect ratio to match device orientation
+    previewWrapper.style.aspectRatio = isDevicePortrait ? '9 / 16' : '16 / 9';
+    console.log('Set initial aspect ratio:', isDevicePortrait ? '9:16 (portrait)' : '16:9 (landscape)');
+}
+
 // Initialize on page load
+setInitialAspectRatio();
 window.addEventListener('load', initCamera);
