@@ -22,8 +22,8 @@ body {
 .container {
     width: 100%;
     min-height: 100vh;
-    background: #080b0f;
-    padding: calc(env(safe-area-inset-top) + 12px) env(safe-area-inset-right) calc(env(safe-area-inset-bottom) + 12px) env(safe-area-inset-left);
+    background: #000;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     position: relative;
     display: flex;
     flex-direction: column;
@@ -32,14 +32,14 @@ body {
 
 h1 {
     color: #fff;
-    font-size: clamp(1.6rem, 4vw, 2.6rem);
+    font-size: clamp(1.4rem, 4vw, 2.2rem);
     font-weight: 800;
     letter-spacing: -0.5px;
     position: absolute;
     top: calc(env(safe-area-inset-top) + 12px);
     left: 50%;
     transform: translateX(-50%);
-    z-index: 5;
+    z-index: 10;
 }
 
 #camera-section {
@@ -55,18 +55,14 @@ h1 {
     width: 100%;
     max-width: 100%;
     margin: 0 auto;
-    background: #020205;
-    border-radius: clamp(20px, 4vw, 32px);
+    background: #000;
+    border-radius: 0;
     overflow: hidden;
-    box-shadow:
-        0 25px 80px rgba(0, 0, 0, 0.5),
-        0 0 0 1px rgba(255, 255, 255, 0.08);
     flex: 1 1 auto;
     height: 100%;
     min-height: 0;
     display: flex;
     align-items: center;
-    padding: clamp(20px, 4vw, 40px) clamp(12px, 3vw, 30px) clamp(70px, 8vh, 110px);
 }
 
 .fullscreen-btn {
@@ -132,22 +128,21 @@ h1 {
 }
 
 #snap-btn {
-    background: #21a0fb;
+    background: rgba(255, 255, 255, 0.08);
     color: white;
-    border: none;
-    width: 80px;
-    height: 80px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    width: 86px;
+    height: 86px;
     border-radius: 50%;
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 700;
     cursor: pointer;
     box-shadow:
-        0 8px 25px rgba(33, 160, 251, 0.4),
-        0 0 0 4px rgba(255, 255, 255, 1),
-        0 0 0 6px rgba(33, 160, 251, 0.3);
+        0 25px 60px rgba(0, 0, 0, 0.6),
+        0 0 0 6px rgba(0, 0, 0, 0.4);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: absolute;
-    bottom: clamp(20px, 3vh, 40px);
+    bottom: calc(env(safe-area-inset-bottom) + 24px);
     left: 50%;
     transform: translateX(-50%);
 }
