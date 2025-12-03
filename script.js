@@ -189,15 +189,19 @@ async function initCamera() {
         // Request camera access with orientation-aware constraints
         const isLandscape = window.matchMedia("(orientation: landscape)").matches;
 
+        // Enforce max resolution to prevent GPU texture upload failures
+        // Mobile cameras can deliver 12-16 MP (4032×3024) which exceeds GPU limits
+        const MAX_DIMENSION = 1920;
+
         const constraints = {
             video: {
                 // Use specific device if available, otherwise use facingMode
                 ...(availableCameras.length > 0 && availableCameras[currentCameraIndex]
                     ? { deviceId: { exact: availableCameras[currentCameraIndex].deviceId } }
                     : { facingMode: 'user' }),
-                // Request dimensions that match current orientation
-                width: { ideal: isLandscape ? 1920 : 1080 },
-                height: { ideal: isLandscape ? 1080 : 1920 },
+                // Enforce max dimensions to prevent GPU texture failures on mobile
+                width: { ideal: isLandscape ? 1920 : 1080, max: MAX_DIMENSION },
+                height: { ideal: isLandscape ? 1080 : 1920, max: MAX_DIMENSION },
                 aspectRatio: { ideal: isLandscape ? 16/9 : 9/16 }
             }
         };
