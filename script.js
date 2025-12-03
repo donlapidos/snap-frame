@@ -1,33 +1,18 @@
 // Configuration
 const USE_SVG = true; // Set to false to use PNG overlays instead
 
-// Get device orientation angle
-function getOrientationAngle() {
-    if (screen.orientation && screen.orientation.angle !== undefined) {
-        return screen.orientation.angle;
-    }
-    // Fallback for older browsers
-    if (window.orientation !== undefined) {
-        return window.orientation;
-    }
-    return 0;
-}
-
-// Dynamic canvas dimensions based on video aspect ratio
+// Get canvas dimensions based on actual video stream
 function getCanvasDimensions() {
-    // Use actual video dimensions if available
+    // Use actual video dimensions directly when available
     if (video.videoWidth > 0 && video.videoHeight > 0) {
-        const aspectRatio = video.videoWidth / video.videoHeight;
-        // Determine orientation based on video aspect ratio
-        if (aspectRatio > 1) {
-            // Landscape video
-            return { width: 1920, height: 1080 };
-        } else {
-            // Portrait video
-            return { width: 1080, height: 1920 };
-        }
+        // Return the camera's real resolution - no rescaling
+        // This preserves 4:3, 1:1, 16:9, or any other aspect ratio
+        return {
+            width: video.videoWidth,
+            height: video.videoHeight
+        };
     }
-    // Fallback to matchMedia only if video not loaded yet
+    // Fallback only when metadata isn't ready (should rarely happen)
     const isLandscape = window.matchMedia("(orientation: landscape)").matches;
     return isLandscape
         ? { width: 1920, height: 1080 }
@@ -63,10 +48,14 @@ const overlayPreview = document.getElementById('overlay-preview');
 const previewWrapper = document.querySelector('.preview-wrapper');
 const previewContainer = document.getElementById('preview-container');
 const fullscreenBtn = document.getElementById('fullscreen-btn');
+const switchCameraBtn = document.getElementById('switch-camera-btn');
 
 let stream = null;
 let overlayImages = {};
 let currentPhotoURL = null; // Store current photo URL for cleanup
+let availableCameras = []; // Store available video input devices
+let currentCameraIndex = 0; // Track current camera
+let shouldMirrorCamera = true; // Track if current camera should be mirrored (true for front camera)
 
 // Stop any existing streams
 function stopExistingStreams() {
@@ -89,6 +78,86 @@ function updatePreviewAspectRatio() {
     }
 }
 
+// Detect camera facing mode and update mirror state
+function updateCameraMirrorState() {
+    if (!stream) return;
+
+    const videoTrack = stream.getVideoTracks()[0];
+    if (!videoTrack) return;
+
+    const settings = videoTrack.getSettings();
+    const facingMode = settings.facingMode;
+    const trackLabel = videoTrack.label.toLowerCase();
+
+    // Determine if camera should be mirrored
+    if (facingMode === 'user') {
+        // Explicit front camera
+        shouldMirrorCamera = true;
+    } else if (facingMode === 'environment') {
+        // Explicit rear camera
+        shouldMirrorCamera = false;
+    } else {
+        // facingMode absent (common on desktop after deviceId switch)
+        // Check label for hints first
+        if (trackLabel.includes('front') || trackLabel.includes('user')) {
+            shouldMirrorCamera = true;
+        } else if (trackLabel.includes('back') || trackLabel.includes('rear') || trackLabel.includes('environment')) {
+            shouldMirrorCamera = false;
+        } else {
+            // No clear indication from facingMode or label
+            // Default to mirroring if only one camera (likely built-in front camera)
+            // Otherwise default to mirroring unless multiple cameras suggest otherwise
+            if (availableCameras.length === 1) {
+                shouldMirrorCamera = true; // Single camera = likely built-in front camera
+            } else {
+                // Multiple cameras with ambiguous labels - default to mirroring
+                // (safer assumption for built-in cameras; external cameras are less common)
+                shouldMirrorCamera = true;
+            }
+        }
+    }
+
+    // Toggle CSS class for video mirroring
+    if (shouldMirrorCamera) {
+        video.classList.add('mirrored');
+    } else {
+        video.classList.remove('mirrored');
+    }
+
+    console.log('Camera facing mode:', facingMode, 'Label:', trackLabel, 'Count:', availableCameras.length, '- Mirror:', shouldMirrorCamera);
+}
+
+// Enumerate available cameras
+async function enumerateCameras() {
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        availableCameras = devices.filter(device => device.kind === 'videoinput');
+
+        // Show switch camera button if multiple cameras available
+        if (availableCameras.length > 1) {
+            switchCameraBtn.classList.remove('hidden');
+        } else {
+            switchCameraBtn.classList.add('hidden');
+        }
+
+        return availableCameras;
+    } catch (error) {
+        console.error('Error enumerating cameras:', error);
+        return [];
+    }
+}
+
+// Switch to next available camera
+async function switchCamera() {
+    if (availableCameras.length <= 1) return;
+
+    // Move to next camera
+    currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
+
+    // Reinitialize camera with new device
+    await initCamera();
+}
+
 // Initialize camera
 async function initCamera() {
     try {
@@ -108,7 +177,10 @@ async function initCamera() {
 
         const constraints = {
             video: {
-                facingMode: 'user',
+                // Use specific device if available, otherwise use facingMode
+                ...(availableCameras.length > 0 && availableCameras[currentCameraIndex]
+                    ? { deviceId: { exact: availableCameras[currentCameraIndex].deviceId } }
+                    : { facingMode: 'user' }),
                 // Request dimensions that match current orientation
                 width: { ideal: isLandscape ? 1920 : 1080 },
                 height: { ideal: isLandscape ? 1080 : 1920 },
@@ -117,6 +189,20 @@ async function initCamera() {
         };
 
         stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+        // Enumerate cameras AFTER permission is granted
+        await enumerateCameras();
+
+        // Align currentCameraIndex with the actual active device
+        const activeTrack = stream.getVideoTracks()[0];
+        if (activeTrack && availableCameras.length > 0) {
+            const activeDeviceId = activeTrack.getSettings().deviceId;
+            const matchingIndex = availableCameras.findIndex(cam => cam.deviceId === activeDeviceId);
+            if (matchingIndex !== -1) {
+                currentCameraIndex = matchingIndex;
+                console.log('Aligned camera index to active device:', currentCameraIndex);
+            }
+        }
 
         video.srcObject = stream;
 
@@ -138,6 +224,9 @@ async function initCamera() {
 
         // Update preview aspect ratio to match actual video
         updatePreviewAspectRatio();
+
+        // Detect camera facing mode and update mirror state
+        updateCameraMirrorState();
 
         // Load overlay assets
         await loadOverlayAssets();
@@ -206,13 +295,14 @@ function drawPreviewOverlay() {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Update canvas dimensions based on current orientation
+    // Update canvas dimensions based on actual video
     const dims = getCanvasDimensions();
     CANVAS_WIDTH = dims.width;
     CANVAS_HEIGHT = dims.height;
 
-    // Calculate scaling based on current orientation
-    const scale = canvas.width / CANVAS_WIDTH;
+    // Calculate scaling based on canvas display width
+    // Use canvas.width (display size) divided by 1080 as base reference
+    const scale = canvas.width / 1080;
 
     // 1. Draw gradient overlay (full background)
     if (overlayImages.gradient || overlayImages.gradient_png) {
@@ -270,7 +360,7 @@ async function snapPhoto() {
             });
         }
 
-        // Get current orientation dimensions
+        // Get actual video dimensions (no rescaling, no cropping)
         const dims = getCanvasDimensions();
 
         // Create canvas for final composition
@@ -279,32 +369,15 @@ async function snapPhoto() {
         canvas.height = dims.height;
         const ctx = canvas.getContext('2d');
 
-        // Calculate video dimensions to maintain aspect ratio
-        const videoAspect = video.videoWidth / video.videoHeight;
-        const canvasAspect = dims.width / dims.height;
-
-        let drawWidth, drawHeight, offsetX, offsetY;
-
-        if (videoAspect > canvasAspect) {
-            // Video is wider - fit to height
-            drawHeight = dims.height;
-            drawWidth = drawHeight * videoAspect;
-            offsetX = -(drawWidth - dims.width) / 2;
-            offsetY = 0;
-        } else {
-            // Video is taller - fit to width
-            drawWidth = dims.width;
-            drawHeight = drawWidth / videoAspect;
-            offsetX = 0;
-            offsetY = -(drawHeight - dims.height) / 2;
-        }
-
-        // Mirror the video horizontally (to match preview)
-        // Translate first, then scale, so offsets work correctly even when letterboxed
+        // Draw video at exact dimensions - no offset calculations needed
+        // since canvas matches video resolution exactly
+        // Mirror only if it's a front-facing camera (to match preview)
         ctx.save();
-        ctx.translate(dims.width, 0);
-        ctx.scale(-1, 1);
-        ctx.drawImage(video, offsetX, offsetY, drawWidth, drawHeight);
+        if (shouldMirrorCamera) {
+            ctx.translate(dims.width, 0);
+            ctx.scale(-1, 1);
+        }
+        ctx.drawImage(video, 0, 0, dims.width, dims.height);
         ctx.restore();
 
         // 1. Draw gradient overlay (full background)
@@ -315,33 +388,36 @@ async function snapPhoto() {
             ctx.globalAlpha = 1.0;
         }
 
+        // Calculate scale factor based on canvas width (relative sizing)
+        const scaleFactor = dims.width / 1080; // Use 1080 as base reference
+
         // 2. Draw logos at top center (Asset 2 - both RRC and BEYOND logos)
         if (overlayImages.logo_rrc || overlayImages.logo_rrc_png) {
             const logoImg = overlayImages.logo_rrc || overlayImages.logo_rrc_png;
-            const logoWidth = 350;
+            const logoWidth = 350 * scaleFactor;
             const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
             const logoX = (dims.width - logoWidth) / 2; // Center horizontally
-            const logoY = 100; // Lowered from 50 to 100
+            const logoY = 100 * scaleFactor;
             ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
         }
 
         // 3. Draw event text at bottom left (Asset 3)
         if (overlayImages.text_event || overlayImages.text_event_png) {
             const textImg = overlayImages.text_event || overlayImages.text_event_png;
-            const textWidth = 550; // Increased size
+            const textWidth = 550 * scaleFactor;
             const textHeight = (textImg.height / textImg.width) * textWidth;
-            const textX = 80;
-            const textY = dims.height - textHeight - 120;
+            const textX = 80 * scaleFactor;
+            const textY = dims.height - textHeight - (120 * scaleFactor);
             ctx.drawImage(textImg, textX, textY, textWidth, textHeight);
         }
 
         // 4. Draw 3D box at bottom right (Asset 4)
         if (overlayImages.box_3d || overlayImages.box_3d_png) {
             const boxImg = overlayImages.box_3d || overlayImages.box_3d_png;
-            const boxWidth = 320; // Increased size significantly
+            const boxWidth = 320 * scaleFactor;
             const boxHeight = (boxImg.height / boxImg.width) * boxWidth;
-            const boxX = dims.width - boxWidth - 80;
-            const boxY = dims.height - boxHeight - 120;
+            const boxX = dims.width - boxWidth - (80 * scaleFactor);
+            const boxY = dims.height - boxHeight - (120 * scaleFactor);
             ctx.drawImage(boxImg, boxX, boxY, boxWidth, boxHeight);
         }
 
@@ -360,6 +436,9 @@ async function snapPhoto() {
         resultPreview.src = currentPhotoURL;
         resultSection.classList.add('show');
         cameraView.classList.add('hidden');
+
+        // Stop camera stream to turn off camera
+        stopExistingStreams();
 
         // Smooth scroll to see result if needed
         setTimeout(() => {
@@ -387,7 +466,7 @@ function downloadPhoto() {
 }
 
 // Retake photo
-function retakePhoto() {
+async function retakePhoto() {
     // Revoke object URL to free memory
     if (currentPhotoURL) {
         URL.revokeObjectURL(currentPhotoURL);
@@ -401,8 +480,8 @@ function retakePhoto() {
     // Clear the result preview
     resultPreview.src = '';
 
-    // Re-enable snap button
-    snapBtn.disabled = false;
+    // Restart camera
+    await initCamera();
 
     // Smooth scroll back to camera view
     setTimeout(() => {
@@ -468,6 +547,7 @@ downloadBtn.addEventListener('click', downloadPhoto);
 document.getElementById('retake-btn').addEventListener('click', retakePhoto);
 document.getElementById('retry-btn').addEventListener('click', retryCamera);
 fullscreenBtn.addEventListener('click', toggleFullscreen);
+switchCameraBtn.addEventListener('click', switchCamera);
 
 // Handle orientation change - update preview aspect ratio and redraw overlays
 let orientationTimeout;

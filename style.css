@@ -7,20 +7,20 @@
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     background: #e6ebef;
-    height: 100vh;
+    min-height: 100vh; /* Changed from height to min-height to allow scrolling */
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     padding: 15px 10px;
-    overflow: hidden;
+    /* Removed overflow: hidden to allow vertical scrolling */
     position: relative;
 }
 
 .container {
     max-width: 500px;
     width: 100%;
-    max-height: 100vh;
+    /* Removed max-height: 100vh to allow container to grow and scroll */
     background: rgba(255, 255, 255, 0.98);
     backdrop-filter: blur(10px);
     border-radius: 24px;
@@ -34,7 +34,7 @@ body {
     z-index: 1;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    /* Removed overflow: hidden to allow scrolling */
 }
 
 h1 {
@@ -71,10 +71,9 @@ h1 {
     align-items: center;
 }
 
-.fullscreen-btn {
+.fullscreen-btn, .switch-camera-btn {
     position: absolute;
     top: 10px;
-    right: 10px;
     z-index: 10;
     background: rgba(0, 0, 0, 0.6);
     border: 2px solid rgba(255, 255, 255, 0.3);
@@ -91,20 +90,28 @@ h1 {
     backdrop-filter: blur(10px);
 }
 
-.fullscreen-btn:hover {
+.fullscreen-btn {
+    right: 10px;
+}
+
+.switch-camera-btn {
+    right: 60px; /* Position to the left of fullscreen button */
+}
+
+.fullscreen-btn:hover, .switch-camera-btn:hover {
     background: rgba(33, 160, 251, 0.8);
     border-color: rgba(255, 255, 255, 0.6);
     transform: scale(1.05);
 }
 
-.fullscreen-btn:active {
+.fullscreen-btn:active, .switch-camera-btn:active {
     transform: scale(0.95);
 }
 
 .preview-wrapper {
     position: relative;
     width: 100%;
-    aspect-ratio: 9 / 16;
+    aspect-ratio: 9 / 16; /* Default fallback - updated dynamically by JavaScript */
     max-height: 100%;
 }
 
@@ -117,7 +124,7 @@ h1 {
     }
 
     .preview-wrapper {
-        aspect-ratio: 16 / 9;
+        aspect-ratio: 16 / 9; /* Default fallback for landscape - updated dynamically by JavaScript */
         max-width: 100%;
         max-height: 100%;
         width: 100%;
@@ -127,15 +134,15 @@ h1 {
 #video {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain; /* Changed from cover to contain to show full video without cropping */
     position: absolute;
     top: 0;
     left: 0;
     transform-origin: center center;
 }
 
-/* Mirror front camera only (not overlays) */
-#video {
+/* Mirror front-facing cameras only (applied via JavaScript based on facingMode) */
+#video.mirrored {
     transform: scaleX(-1);
 }
 
