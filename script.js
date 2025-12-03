@@ -3,14 +3,28 @@ const USE_SVG = true; // Set to false to use PNG overlays instead
 
 // Get canvas dimensions based on actual video stream
 function getCanvasDimensions() {
-    // Use actual video dimensions directly when available
+    // Use actual video dimensions when available
     if (video.videoWidth > 0 && video.videoHeight > 0) {
-        // Return the camera's real resolution - no rescaling
-        // This preserves 4:3, 1:1, 16:9, or any other aspect ratio
-        return {
-            width: video.videoWidth,
-            height: video.videoHeight
-        };
+        const aspectRatio = video.videoWidth / video.videoHeight;
+
+        // Cap to safe GPU limits while preserving aspect ratio
+        // Modern cameras can be 4032×3024 (12MP) but canvas has ~4096px limit
+        // Max long edge of 1920 keeps us well under GPU limits
+        const MAX_DIMENSION = 1920;
+
+        let width, height;
+
+        if (aspectRatio > 1) {
+            // Landscape: cap width, calculate height
+            width = Math.min(video.videoWidth, MAX_DIMENSION);
+            height = Math.round(width / aspectRatio);
+        } else {
+            // Portrait: cap height, calculate width
+            height = Math.min(video.videoHeight, MAX_DIMENSION);
+            width = Math.round(height * aspectRatio);
+        }
+
+        return { width, height };
     }
     // Fallback only when metadata isn't ready (should rarely happen)
     const isLandscape = window.matchMedia("(orientation: landscape)").matches;
