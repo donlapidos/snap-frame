@@ -22,36 +22,34 @@ body {
 .container {
     width: 100%;
     min-height: 100vh;
-    background: rgba(255, 255, 255, 0.98);
-    backdrop-filter: blur(10px);
-    border-radius: 0;
-    box-shadow:
-        0 10px 40px rgba(0, 0, 0, 0.2),
-        0 0 0 1px rgba(255, 255, 255, 0.08) inset;
-    padding: clamp(18px, 4vw, 48px);
-    text-align: center;
-    margin: 0;
+    background: #f7f9fb;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     position: relative;
-    z-index: 1;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
 h1 {
     color: #262d34;
-    margin-bottom: 18px;
-    font-size: 2rem;
+    font-size: clamp(1.5rem, 4vw, 2.4rem);
     font-weight: 800;
     letter-spacing: -0.5px;
-    flex-shrink: 0;
+    position: absolute;
+    top: clamp(16px, 4vw, 32px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
 }
 
 #camera-section {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: clamp(12px, 1.5vh, 24px);
     min-height: 0;
+    height: 100%;
+    padding-top: clamp(60px, 10vh, 120px); /* space for title */
+    padding-bottom: clamp(40px, 8vh, 90px); /* space for bottom controls */
 }
 
 .preview-container {
@@ -186,13 +184,14 @@ h1 {
 }
 
 .result-section {
+    position: absolute;
+    inset: 0;
+    padding: clamp(20px, 6vw, 60px);
+    background: rgba(0, 0, 0, 0.85);
     display: none;
-    animation: fadeIn 0.4s ease;
-    flex: 1;
     flex-direction: column;
-    min-height: 0;
-    overflow-y: auto;
-    margin-top: clamp(12px, 2vh, 24px);
+    justify-content: center;
+    align-items: center;
 }
 
 .result-section.show {
@@ -200,27 +199,23 @@ h1 {
 }
 
 .result-section h2 {
-    font-size: 1.4rem;
-    margin-bottom: 15px;
-    color: #333;
+    font-size: 1.5rem;
+    margin-bottom: 18px;
+    color: #fff;
     font-weight: 700;
-    flex-shrink: 0;
 }
 
 #result-preview {
-    max-width: 100%;
-    width: auto;
+    max-width: min(90vw, 600px);
+    width: 100%;
     height: auto;
-    max-height: 100%;
-    border-radius: 20px;
+    max-height: 70vh;
+    border-radius: 24px;
     box-shadow:
-        0 10px 40px rgba(0, 0, 0, 0.3),
-        0 0 0 1px rgba(255, 255, 255, 0.1);
-    margin: 0 auto;
-    display: block;
+        0 20px 60px rgba(0, 0, 0, 0.6),
+        0 0 0 1px rgba(255, 255, 255, 0.2);
+    margin-bottom: 20px;
     object-fit: contain;
-    flex: 1;
-    min-height: 0;
 }
 
 @keyframes fadeIn {
