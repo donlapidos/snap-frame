@@ -83,28 +83,10 @@ function stopExistingStreams() {
 // Update preview wrapper aspect ratio based on actual video dimensions
 function updatePreviewAspectRatio() {
     if (video.videoWidth > 0 && video.videoHeight > 0) {
-        let width = video.videoWidth;
-        let height = video.videoHeight;
-
-        // Detect device orientation
-        const isDevicePortrait = window.matchMedia('(orientation: portrait)').matches;
-        const isVideoLandscape = width > height;
-
-        // Swap dimensions if device orientation doesn't match video metadata
-        // This fixes iOS Safari reporting landscape (1920×1080) when device is portrait
-        if (isDevicePortrait && isVideoLandscape) {
-            // Device is portrait but video reports landscape → swap
-            [width, height] = [height, width];
-            console.log('Swapped dimensions for portrait device');
-        } else if (!isDevicePortrait && !isVideoLandscape) {
-            // Device is landscape but video reports portrait → swap
-            [width, height] = [height, width];
-            console.log('Swapped dimensions for landscape device');
-        }
-
-        const aspectRatio = width + ' / ' + height;
-        previewWrapper.style.aspectRatio = aspectRatio;
-        console.log('Updated preview aspect ratio to:', aspectRatio, '(device orientation:', isDevicePortrait ? 'portrait' : 'landscape', ')');
+        // Allow CSS height rules to govern layout; ensure wrapper fills container
+        previewWrapper.style.removeProperty('aspect-ratio');
+        previewWrapper.style.height = '100%';
+        previewWrapper.style.width = '100%';
     }
 }
 
