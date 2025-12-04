@@ -42,6 +42,51 @@ h1 {
     z-index: 10;
 }
 
+/* Toast notifications */
+.toast-container {
+    position: fixed;
+    top: calc(env(safe-area-inset-top) + 60px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    width: 90%;
+    max-width: 400px;
+    pointer-events: none;
+}
+
+.toast {
+    background: rgba(220, 38, 38, 0.95);
+    color: white;
+    padding: 14px 18px;
+    border-radius: 12px;
+    margin-bottom: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    font-size: 0.9rem;
+    line-height: 1.4;
+    animation: slideIn 0.3s ease;
+    backdrop-filter: blur(10px);
+    pointer-events: auto;
+}
+
+.toast.success {
+    background: rgba(34, 197, 94, 0.95);
+}
+
+.toast.info {
+    background: rgba(33, 160, 251, 0.95);
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 #camera-section {
     flex: 1;
     display: flex;
@@ -65,34 +110,71 @@ h1 {
     align-items: center;
 }
 
-.fullscreen-btn {
+/* Controls wrapper - positions buttons within thumb reach */
+.controls-wrapper {
     position: absolute;
-    top: 10px;
+    bottom: calc(env(safe-area-inset-bottom) + 20px);
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+}
+
+/* Control buttons (flip & fullscreen) - pill-style for text labels */
+.control-btn {
     background: rgba(0, 0, 0, 0.6);
     border: 2px solid rgba(255, 255, 255, 0.3);
     color: white;
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
-    font-size: 1.2rem;
+    min-width: 64px;
+    min-height: 48px;
+    height: 48px;
+    padding: 0 16px;
+    border-radius: 24px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.2s ease;
     backdrop-filter: blur(10px);
-    right: 10px;
+    -webkit-tap-highlight-color: transparent;
+    flex-shrink: 0;
 }
 
-.fullscreen-btn:hover {
+.control-btn .btn-label {
+    user-select: none;
+    -webkit-user-select: none;
+    white-space: nowrap;
+}
+
+.control-btn:hover:not(:disabled) {
     background: rgba(33, 160, 251, 0.8);
     border-color: rgba(255, 255, 255, 0.6);
     transform: scale(1.05);
 }
 
-.fullscreen-btn:active {
+.control-btn:active:not(:disabled) {
     transform: scale(0.95);
+}
+
+.control-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#flip-camera-btn.flipping {
+    animation: flip-spin 0.6s ease;
+}
+
+@keyframes flip-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 .preview-wrapper {
@@ -100,6 +182,38 @@ h1 {
     width: 100%;
     max-height: 100%;
     height: 100%;
+}
+
+/* Loading shimmer overlay */
+.preview-wrapper::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.1) 50%,
+        transparent 100%);
+    z-index: 5;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.preview-wrapper.loading::before {
+    opacity: 1;
+    animation: shimmer 1.2s infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        left: -100%;
+    }
+    100% {
+        left: 100%;
+    }
 }
 
 #video {
@@ -131,20 +245,20 @@ h1 {
     background: rgba(255, 255, 255, 0.08);
     color: white;
     border: 2px solid rgba(255, 255, 255, 0.2);
-    width: 86px;
-    height: 86px;
+    min-width: 72px;
+    min-height: 72px;
+    width: 72px;
+    height: 72px;
     border-radius: 50%;
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 700;
     cursor: pointer;
     box-shadow:
-        0 25px 60px rgba(0, 0, 0, 0.6),
-        0 0 0 6px rgba(0, 0, 0, 0.4);
+        0 8px 20px rgba(0, 0, 0, 0.6),
+        0 0 0 4px rgba(0, 0, 0, 0.4);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    position: absolute;
-    bottom: calc(env(safe-area-inset-bottom) + 24px);
-    left: 50%;
-    transform: translateX(-50%);
+    -webkit-tap-highlight-color: transparent;
+    flex-shrink: 0;
 }
 
 #snap-btn::after {
@@ -161,7 +275,7 @@ h1 {
 }
 
 #snap-btn:hover:not(:disabled) {
-    transform: translateX(-50%) scale(1.08);
+    transform: scale(1.08);
     box-shadow:
         0 12px 35px rgba(33, 160, 251, 0.5),
         0 0 0 4px rgba(255, 255, 255, 1),
@@ -169,7 +283,7 @@ h1 {
 }
 
 #snap-btn:active:not(:disabled) {
-    transform: translateX(-50%) scale(0.98);
+    transform: scale(0.98);
 }
 
 #snap-btn:disabled {
@@ -181,6 +295,10 @@ h1 {
     position: absolute;
     inset: 0;
     padding: clamp(20px, 6vw, 60px);
+    padding-top: calc(clamp(20px, 6vw, 60px) + env(safe-area-inset-top));
+    padding-bottom: calc(clamp(20px, 6vw, 60px) + env(safe-area-inset-bottom));
+    padding-left: calc(clamp(20px, 6vw, 60px) + env(safe-area-inset-left));
+    padding-right: calc(clamp(20px, 6vw, 60px) + env(safe-area-inset-right));
     background: rgba(0, 0, 0, 0.85);
     display: none;
     flex-direction: column;

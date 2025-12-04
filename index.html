@@ -2,9 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>Snap & Frame</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -12,23 +15,33 @@
     <div class="container">
         <h1>Snap & Frame</h1>
 
+        <!-- Toast notification container -->
+        <div id="toast-container" class="toast-container"></div>
+
         <div class="error-message" id="error-message">
-            <h2>We couldn't access your camera</h2>
-            <p>Please check browser permissions or try another device. Make sure you're using a modern browser (Chrome, Edge, Safari, or Firefox).</p>
+            <h2>Camera Access Needed</h2>
+            <p>Please tap "Allow" when prompted for camera permission. If you've denied access, go to your phone's Settings app to enable camera access for this site.</p>
             <button id="retry-btn">Retry Camera Access</button>
         </div>
 
         <div id="camera-section">
             <div class="preview-container" id="preview-container">
-                <button id="fullscreen-btn" class="fullscreen-btn" title="Fullscreen preview">⛶</button>
                 <div class="preview-wrapper">
                     <video id="video" autoplay playsinline muted></video>
                     <canvas id="overlay-preview" class="overlay-canvas"></canvas>
                 </div>
-                <button id="snap-btn" disabled>
-                    <span id="snap-text">Snap</span>
-                    <span id="snap-loading" class="loading hidden"></span>
-                </button>
+                <div class="controls-wrapper">
+                    <button id="flip-camera-btn" class="control-btn" aria-label="Switch camera" disabled>
+                        <span class="btn-label">Flip</span>
+                    </button>
+                    <button id="snap-btn" disabled>
+                        <span id="snap-text">Snap</span>
+                        <span id="snap-loading" class="loading hidden"></span>
+                    </button>
+                    <button id="fullscreen-btn" class="control-btn" aria-label="Toggle fullscreen">
+                        <span class="btn-label">Full</span>
+                    </button>
+                </div>
             </div>
         </div>
 

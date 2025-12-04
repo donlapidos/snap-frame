@@ -7,27 +7,27 @@ function getCanvasDimensions() {
     if (video.videoWidth > 0 && video.videoHeight > 0) {
         const aspectRatio = video.videoWidth / video.videoHeight;
 
-        // Cap to safe GPU limits while preserving aspect ratio
-        // Modern cameras can be 4032×3024 (12MP) but canvas has ~4096px limit
-        // Max long edge of 1920 keeps us well under GPU limits
-        const MAX_DIMENSION = 1920;
+        // Cap to 1080×1920 for performance and battery
+        const MAX_WIDTH = 1080;
+        const MAX_HEIGHT = 1920;
 
         let width, height;
 
         if (aspectRatio > 1) {
-            // Landscape: cap width, calculate height
-            width = Math.min(video.videoWidth, MAX_DIMENSION);
+            // Landscape: cap width to 1920, calculate height
+            width = Math.min(video.videoWidth, MAX_HEIGHT);
             height = Math.round(width / aspectRatio);
         } else {
-            // Portrait: cap height, calculate width
-            height = Math.min(video.videoHeight, MAX_DIMENSION);
+            // Portrait: cap height to 1920, calculate width
+            height = Math.min(video.videoHeight, MAX_HEIGHT);
             width = Math.round(height * aspectRatio);
         }
 
         return { width, height };
     }
-    // Fallback only when metadata isn't ready (should rarely happen)
-    const isLandscape = window.matchMedia("(orientation: landscape)").matches;
+    // Fallback: portrait default
+    const angle = getCurrentOrientation();
+    const isLandscape = (angle === 90 || angle === -90 || angle === 270);
     return isLandscape
         ? { width: 1920, height: 1080 }
         : { width: 1080, height: 1920 };
@@ -62,11 +62,31 @@ const overlayPreview = document.getElementById('overlay-preview');
 const previewWrapper = document.querySelector('.preview-wrapper');
 const previewContainer = document.getElementById('preview-container');
 const fullscreenBtn = document.getElementById('fullscreen-btn');
+const flipCameraBtn = document.getElementById('flip-camera-btn');
+const toastContainer = document.getElementById('toast-container');
 
 let stream = null;
 let overlayImages = {};
 let currentPhotoURL = null; // Store current photo URL for cleanup
 let shouldMirrorCamera = true; // Track if current camera should be mirrored (true for front camera)
+let currentFacingMode = 'user'; // Default to front camera (compliant with no-persistence requirement)
+let lastOrientationAngle = null; // Track last orientation to detect real changes
+let isLoadingCamera = false; // Prevent concurrent camera initializations
+let orientationMQ = null; // Store MediaQueryList reference for proper cleanup
+
+// Show toast notification (mobile-friendly alternative to alert)
+function showToast(message, type = 'error', duration = 4000) {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    toastContainer.appendChild(toast);
+
+    // Auto-dismiss after duration
+    setTimeout(() => {
+        toast.style.animation = 'slideIn 0.3s ease reverse';
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+}
 
 // Stop any existing streams
 function stopExistingStreams() {
@@ -83,10 +103,10 @@ function stopExistingStreams() {
 // Update preview wrapper aspect ratio based on actual video dimensions
 function updatePreviewAspectRatio() {
     if (video.videoWidth > 0 && video.videoHeight > 0) {
-        // Allow CSS height rules to govern layout; ensure wrapper fills container
-        previewWrapper.style.removeProperty('aspect-ratio');
-        previewWrapper.style.height = '100%';
-        previewWrapper.style.width = '100%';
+        // Set aspect ratio to match video dimensions for proper display
+        previewWrapper.style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
+        previewWrapper.style.removeProperty('height');
+        previewWrapper.style.removeProperty('width');
     }
 }
 
@@ -122,13 +142,30 @@ function updateCameraMirrorState() {
     console.log('Camera facing mode:', facingMode, 'Label:', trackLabel, '- Mirror:', shouldMirrorCamera);
 }
 
+// Get current orientation angle (cross-browser)
+function getCurrentOrientation() {
+    if (screen.orientation && screen.orientation.angle !== undefined) {
+        return screen.orientation.angle;
+    } else if (window.orientation !== undefined) {
+        return window.orientation;
+    }
+    return 0; // Fallback
+}
+
 // Initialize camera
-async function initCamera() {
+async function initCamera(facingMode = currentFacingMode) {
     try {
+        // Prevent concurrent initializations
+        if (isLoadingCamera) return;
+        isLoadingCamera = true;
+
         // Check if getUserMedia is supported
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             throw new Error('getUserMedia not supported');
         }
+
+        // Update current facing mode
+        currentFacingMode = facingMode;
 
         // Stop any existing streams first
         stopExistingStreams();
@@ -136,19 +173,23 @@ async function initCamera() {
         // Small delay to ensure camera is released
         await new Promise(resolve => setTimeout(resolve, 100));
 
-        // Request camera access with orientation-aware constraints
-        const isLandscape = window.matchMedia("(orientation: landscape)").matches;
+        // Track current orientation
+        lastOrientationAngle = getCurrentOrientation();
 
-        // Enforce max resolution to prevent GPU texture upload failures
-        // Mobile cameras can deliver 12-16 MP (4032×3024) which exceeds GPU limits
-        const MAX_DIMENSION = 1920;
+        // Determine orientation - treat portrait as default
+        const angle = getCurrentOrientation();
+        const isLandscape = (angle === 90 || angle === -90 || angle === 270);
+
+        // Cap resolution to 1080×1920 for performance and battery life
+        const MAX_WIDTH = 1080;
+        const MAX_HEIGHT = 1920;
 
         const constraints = {
             video: {
-                facingMode: 'user',
-                // Enforce max dimensions to prevent GPU texture failures on mobile
-                width: { ideal: isLandscape ? 1920 : 1080, max: MAX_DIMENSION },
-                height: { ideal: isLandscape ? 1080 : 1920, max: MAX_DIMENSION },
+                facingMode: facingMode,
+                // Portrait default: 1080×1920, Landscape: 1920×1080
+                width: { ideal: isLandscape ? MAX_HEIGHT : MAX_WIDTH, max: MAX_HEIGHT },
+                height: { ideal: isLandscape ? MAX_WIDTH : MAX_HEIGHT, max: MAX_HEIGHT },
                 aspectRatio: { ideal: isLandscape ? 16/9 : 9/16 }
             }
         };
@@ -179,11 +220,19 @@ async function initCamera() {
         // Detect camera facing mode and update mirror state
         updateCameraMirrorState();
 
-        // Load overlay assets
-        await loadOverlayAssets();
+        // Load overlay assets only if not already cached
+        const overlayKeys = USE_SVG
+            ? ['logo_rrc', 'text_event', 'box_3d', 'gradient']
+            : ['logo_rrc_png', 'text_event_png', 'box_3d_png', 'gradient_png'];
+        const overlaysLoaded = overlayKeys.some(key => overlayImages[key]);
 
-        // Enable snap button only after everything is ready
+        if (!overlaysLoaded) {
+            await loadOverlayAssets();
+        }
+
+        // Enable buttons only after everything is ready
         snapBtn.disabled = false;
+        flipCameraBtn.disabled = false;
 
         // Draw preview overlay
         drawPreviewOverlay();
@@ -192,12 +241,12 @@ async function initCamera() {
         // Log error for debugging (doesn't expose sensitive info)
         if (error.name) console.error('Camera access error:', error.name);
 
-        // More detailed error messages
-        let errorMsg = 'We couldn\'t access your camera. ';
+        // Mobile-friendly error messages
+        let errorMsg = 'Camera access issue. ';
         if (error.name === 'NotReadableError') {
-            errorMsg += 'The camera is currently in use by another application. Please close other apps using the camera and refresh this page.';
+            errorMsg += 'Your camera is being used by another app. Please close other camera apps and try again.';
         } else if (error.name === 'NotAllowedError') {
-            errorMsg += 'Camera access was denied. Please check your browser permissions.';
+            errorMsg += 'Camera permission was denied. Go to your phone\'s Settings to enable camera access.';
         } else if (error.name === 'NotFoundError') {
             errorMsg += 'No camera was found on your device.';
         } else {
@@ -205,6 +254,8 @@ async function initCamera() {
         }
 
         showError(errorMsg);
+    } finally {
+        isLoadingCamera = false;
     }
 }
 
@@ -388,8 +439,8 @@ async function snapPhoto() {
         resultSection.classList.add('show');
         cameraView.classList.add('hidden');
 
-        // Stop camera stream to turn off camera
-        stopExistingStreams();
+        // Keep stream alive for faster retake (don't stop camera)
+        // Video element will be hidden but stream stays active
 
         // Smooth scroll to see result if needed
         setTimeout(() => {
@@ -399,7 +450,7 @@ async function snapPhoto() {
     } catch (error) {
         // Log error type only (no sensitive details)
         if (error.name) console.error('Capture error:', error.name);
-        alert('Failed to capture photo. Please try again.');
+        showToast('Failed to capture photo. Please try again.');
     } finally {
         // Re-enable button
         snapBtn.disabled = false;
@@ -408,12 +459,44 @@ async function snapPhoto() {
     }
 }
 
-// Download photo
-function downloadPhoto() {
-    const link = document.createElement('a');
-    link.download = 'framed-photo.png';
-    link.href = resultPreview.src;
-    link.click();
+// Download photo (with iOS fallback)
+async function downloadPhoto() {
+    // Try Web Share API first (works on iOS)
+    if (navigator.share && navigator.canShare) {
+        try {
+            // Convert blob URL to actual blob for sharing
+            const response = await fetch(resultPreview.src);
+            const blob = await response.blob();
+            const file = new File([blob], 'framed-photo.png', { type: 'image/png' });
+
+            if (navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: 'Framed Photo',
+                    text: 'Check out my framed photo!'
+                });
+                showToast('Photo shared successfully!', 'success');
+                return;
+            }
+        } catch (error) {
+            // Share was cancelled or failed, fall through to download
+            if (error.name !== 'AbortError') {
+                console.log('Share failed:', error);
+            }
+        }
+    }
+
+    // Fallback to traditional download (works on Android, desktop)
+    if (isIOS()) {
+        // iOS Safari doesn't support download attribute
+        showToast('Long-press the image above and tap "Save to Photos"', 'info', 6000);
+    } else {
+        const link = document.createElement('a');
+        link.download = 'framed-photo.png';
+        link.href = resultPreview.src;
+        link.click();
+        showToast('Photo downloaded!', 'success');
+    }
 }
 
 // Retake photo
@@ -431,8 +514,8 @@ async function retakePhoto() {
     // Clear the result preview
     resultPreview.src = '';
 
-    // Restart camera
-    await initCamera();
+    // No need to restart camera - stream is still active from initial load
+    // This makes retakes much faster (no camera boot or asset reload)
 
     // Smooth scroll back to camera view
     setTimeout(() => {
@@ -462,14 +545,44 @@ function retryCamera() {
     initCamera();
 }
 
-// Toggle fullscreen preview
+// Detect iOS
+function isIOS() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+           (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+// Check if fullscreen API is supported
+function isFullscreenSupported() {
+    return !!(
+        document.fullscreenEnabled ||
+        document.webkitFullscreenEnabled ||
+        document.mozFullScreenEnabled ||
+        document.msFullscreenEnabled
+    );
+}
+
+// Initialize fullscreen button visibility
+function initFullscreenButton() {
+    if (isIOS() || !isFullscreenSupported()) {
+        // Hide fullscreen button on iOS (rely on immersive viewport)
+        fullscreenBtn.style.display = 'none';
+        console.log('iOS detected or Fullscreen API not supported - button hidden, using immersive viewport');
+    } else {
+        // Keep button visible on Android and other platforms
+        fullscreenBtn.style.display = '';
+        console.log('Fullscreen button enabled');
+    }
+}
+
+// Toggle fullscreen preview (only called on platforms where button is visible)
 function toggleFullscreen() {
-    if (!document.fullscreenElement) {
+    if (!document.fullscreenElement && !document.webkitFullscreenElement &&
+        !document.mozFullScreenElement && !document.msFullscreenElement) {
         // Enter fullscreen
         if (previewContainer.requestFullscreen) {
             previewContainer.requestFullscreen();
         } else if (previewContainer.webkitRequestFullscreen) {
-            // Safari
+            // Safari (desktop)
             previewContainer.webkitRequestFullscreen();
         } else if (previewContainer.mozRequestFullScreen) {
             // Firefox
@@ -492,25 +605,104 @@ function toggleFullscreen() {
     }
 }
 
+// Flip camera with optimized approach
+async function flipCamera() {
+    if (!stream) return;
+
+    // Disable button and show loading shimmer during flip
+    flipCameraBtn.disabled = true;
+    flipCameraBtn.classList.add('flipping');
+    previewWrapper.classList.add('loading');
+
+    try {
+        const videoTrack = stream.getVideoTracks()[0];
+        if (!videoTrack) {
+            throw new Error('No video track available');
+        }
+
+        // Determine new facing mode
+        const newFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+
+        // Try optimized approach: applyConstraints (no stream restart)
+        try {
+            await videoTrack.applyConstraints({
+                facingMode: { exact: newFacingMode }
+            });
+
+            // Success - update state (no persistence per spec requirements)
+            currentFacingMode = newFacingMode;
+            updateCameraMirrorState();
+            updatePreviewAspectRatio();
+            drawPreviewOverlay();
+
+            console.log('Camera flipped using applyConstraints to', newFacingMode);
+        } catch (constraintError) {
+            // applyConstraints failed, fall back to full reinitialization
+            console.log('applyConstraints failed, reinitializing camera:', constraintError.message);
+
+            // Full reinitialization
+            await initCamera(newFacingMode);
+        }
+    } catch (error) {
+        console.error('Camera flip error:', error.name);
+        showToast('Failed to switch camera. Please try again.');
+    } finally {
+        // Re-enable button and remove animation classes
+        flipCameraBtn.disabled = false;
+        previewWrapper.classList.remove('loading');
+        // Delay removing class to ensure animation completes
+        setTimeout(() => {
+            flipCameraBtn.classList.remove('flipping');
+        }, 600);
+    }
+}
+
+// Check available cameras and hide flip button if only one
+async function initFlipButton() {
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+        if (videoDevices.length <= 1) {
+            // Hide flip button if only one camera
+            flipCameraBtn.style.display = 'none';
+            console.log('Only one camera available - flip button hidden');
+        } else {
+            flipCameraBtn.style.display = '';
+        }
+    } catch (error) {
+        console.log('Could not enumerate devices:', error);
+        // Keep button visible by default if we can't check
+    }
+}
+
 // Event listeners
 snapBtn.addEventListener('click', snapPhoto);
 downloadBtn.addEventListener('click', downloadPhoto);
 document.getElementById('retake-btn').addEventListener('click', retakePhoto);
 document.getElementById('retry-btn').addEventListener('click', retryCamera);
 fullscreenBtn.addEventListener('click', toggleFullscreen);
+flipCameraBtn.addEventListener('click', flipCamera);
 
-// Handle orientation change - update preview aspect ratio and redraw overlays
+// Handle orientation change - restart stream with new constraints
 let orientationTimeout;
 async function handleOrientationChange() {
     clearTimeout(orientationTimeout);
-    orientationTimeout = setTimeout(() => {
-        // Update preview aspect ratio to match video
-        updatePreviewAspectRatio();
+    orientationTimeout = setTimeout(async () => {
+        const newAngle = getCurrentOrientation();
 
-        // Redraw the overlay with new dimensions
-        // Video stream automatically adjusts to device rotation
-        if (overlayImages.logo_rrc || overlayImages.logo_rrc_png) {
-            drawPreviewOverlay();
+        // Only restart if orientation actually changed (not just a resize)
+        if (lastOrientationAngle !== null && lastOrientationAngle !== newAngle) {
+            console.log('Orientation changed from', lastOrientationAngle, 'to', newAngle, '- restarting stream');
+
+            // Restart camera with current facing mode to get proper orientation
+            await initCamera(currentFacingMode);
+        } else {
+            // Just update the preview and redraw overlays
+            updatePreviewAspectRatio();
+            if (overlayImages.logo_rrc || overlayImages.logo_rrc_png) {
+                drawPreviewOverlay();
+            }
         }
     }, 300); // Delay to ensure orientation has settled
 }
@@ -520,7 +712,7 @@ window.addEventListener('orientationchange', handleOrientationChange);
 
 // Also listen for media query changes (with cross-browser support)
 if (window.matchMedia) {
-    const orientationMQ = window.matchMedia('(orientation: portrait)');
+    orientationMQ = window.matchMedia('(orientation: portrait)');
     // Use addEventListener if available (modern browsers), otherwise addListener (Safari/older browsers)
     if (orientationMQ.addEventListener) {
         orientationMQ.addEventListener('change', handleOrientationChange);
@@ -529,6 +721,27 @@ if (window.matchMedia) {
     }
 }
 
+// Handle visibility change - pause stream when tab is hidden to save battery
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        // Tab is hidden - pause video to save battery
+        if (stream && video) {
+            stream.getVideoTracks().forEach(track => {
+                track.enabled = false;
+            });
+            console.log('Tab hidden - camera paused to save battery');
+        }
+    } else {
+        // Tab is visible again - resume video
+        if (stream && video) {
+            stream.getVideoTracks().forEach(track => {
+                track.enabled = true;
+            });
+            console.log('Tab visible - camera resumed');
+        }
+    }
+});
+
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {
     stopExistingStreams();
@@ -536,9 +749,8 @@ window.addEventListener('beforeunload', () => {
     if (currentPhotoURL) {
         URL.revokeObjectURL(currentPhotoURL);
     }
-    // Clean up matchMedia listener
-    if (window.matchMedia) {
-        const orientationMQ = window.matchMedia('(orientation: portrait)');
+    // Clean up matchMedia listener using stored reference
+    if (orientationMQ) {
         if (orientationMQ.removeEventListener) {
             orientationMQ.removeEventListener('change', handleOrientationChange);
         } else if (orientationMQ.removeListener) {
@@ -558,4 +770,6 @@ function setInitialAspectRatio() {
 
 // Initialize on page load
 setInitialAspectRatio();
-window.addEventListener('load', initCamera);
+initFullscreenButton();
+initFlipButton();
+window.addEventListener('load', () => initCamera());
