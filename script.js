@@ -220,13 +220,18 @@ async function initCamera(facingMode = currentFacingMode) {
         // Detect camera facing mode and update mirror state
         updateCameraMirrorState();
 
-        // Load overlay assets only if not already cached
+        // Enable full-bleed mode after orientation stabilizes
+        setTimeout(() => {
+            previewWrapper.classList.add('full-bleed');
+        }, 300);
+
+        // Load overlay assets only if ALL are already cached
         const overlayKeys = USE_SVG
             ? ['logo_rrc', 'text_event', 'box_3d', 'gradient']
             : ['logo_rrc_png', 'text_event_png', 'box_3d_png', 'gradient_png'];
-        const overlaysLoaded = overlayKeys.some(key => overlayImages[key]);
+        const allOverlaysLoaded = overlayKeys.every(key => overlayImages[key]);
 
-        if (!overlaysLoaded) {
+        if (!allOverlaysLoaded) {
             await loadOverlayAssets();
         }
 
@@ -459,43 +464,52 @@ async function snapPhoto() {
     }
 }
 
-// Download photo (with iOS fallback)
+// Download photo (with iOS Share API)
 async function downloadPhoto() {
-    // Try Web Share API first (works on iOS)
-    if (navigator.share && navigator.canShare) {
-        try {
-            // Convert blob URL to actual blob for sharing
-            const response = await fetch(resultPreview.src);
-            const blob = await response.blob();
-            const file = new File([blob], 'framed-photo.png', { type: 'image/png' });
+    try {
+        // Convert blob URL to actual blob
+        const response = await fetch(resultPreview.src);
+        const blob = await response.blob();
+        const file = new File([blob], 'framed-photo.png', { type: 'image/png' });
 
-            if (navigator.canShare({ files: [file] })) {
-                await navigator.share({
-                    files: [file],
-                    title: 'Framed Photo',
-                    text: 'Check out my framed photo!'
-                });
-                showToast('Photo shared successfully!', 'success');
-                return;
-            }
-        } catch (error) {
-            // Share was cancelled or failed, fall through to download
-            if (error.name !== 'AbortError') {
-                console.log('Share failed:', error);
+        // Try Web Share API first (works on iOS and Android)
+        if (navigator.share && navigator.canShare) {
+            try {
+                if (navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: 'Framed Photo',
+                        text: 'My framed photo'
+                    });
+                    // Don't show success toast if user shared (could be cancelled)
+                    return;
+                }
+            } catch (error) {
+                // If AbortError, user cancelled - don't show error
+                if (error.name === 'AbortError') {
+                    return;
+                }
+                console.log('Share failed, falling back:', error);
+                // Fall through to download
             }
         }
-    }
 
-    // Fallback to traditional download (works on Android, desktop)
-    if (isIOS()) {
-        // iOS Safari doesn't support download attribute
-        showToast('Long-press the image above and tap "Save to Photos"', 'info', 6000);
-    } else {
-        const link = document.createElement('a');
-        link.download = 'framed-photo.png';
-        link.href = resultPreview.src;
-        link.click();
-        showToast('Photo downloaded!', 'success');
+        // Fallback: traditional download (works on desktop, some Android browsers)
+        if (!isIOS()) {
+            const link = document.createElement('a');
+            link.download = 'framed-photo.png';
+            link.href = URL.createObjectURL(blob);
+            link.click();
+            // Clean up
+            setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+            showToast('Photo downloaded!', 'success', 2000);
+        } else {
+            // iOS Safari without Share API support (rare, but fallback)
+            showToast('Long-press the image and tap "Save Image"', 'info', 6000);
+        }
+    } catch (error) {
+        console.error('Download error:', error);
+        showToast('Failed to save photo. Please try again.', 'error');
     }
 }
 
@@ -537,9 +551,9 @@ function showError(customMessage) {
 
 // Retry camera access
 function retryCamera() {
-    // Hide error and show camera section
+    // Hide error and show camera section (reset to default flex display)
     errorMessage.classList.remove('show');
-    document.getElementById('camera-section').style.display = 'block';
+    document.getElementById('camera-section').style.display = '';
 
     // Reinitialize camera
     initCamera();
@@ -691,13 +705,29 @@ async function handleOrientationChange() {
     orientationTimeout = setTimeout(async () => {
         const newAngle = getCurrentOrientation();
 
-        // Only restart if orientation actually changed (not just a resize)
-        if (lastOrientationAngle !== null && lastOrientationAngle !== newAngle) {
+        // Determine orientation types (portrait: 0/180, landscape: ±90)
+        const isPortrait = (angle) => angle === 0 || angle === 180 || angle === -180;
+        const wasPortrait = lastOrientationAngle !== null && isPortrait(lastOrientationAngle);
+        const nowPortrait = isPortrait(newAngle);
+
+        // Only restart if orientation actually changed (portrait <-> landscape)
+        if (lastOrientationAngle !== null && wasPortrait !== nowPortrait) {
             console.log('Orientation changed from', lastOrientationAngle, 'to', newAngle, '- restarting stream');
+
+            // Show visual feedback
+            showToast('Rotating camera...', 'info', 2000);
+            previewWrapper.classList.add('rotating');
+            previewWrapper.classList.remove('full-bleed');
 
             // Restart camera with current facing mode to get proper orientation
             await initCamera(currentFacingMode);
-        } else {
+
+            // Remove rotating class after transition
+            setTimeout(() => {
+                previewWrapper.classList.remove('rotating');
+            }, 600);
+        } else if (lastOrientationAngle !== newAngle) {
+            // Same orientation type but different angle (e.g., 0° -> 180°)
             // Just update the preview and redraw overlays
             updatePreviewAspectRatio();
             if (overlayImages.logo_rrc || overlayImages.logo_rrc_png) {

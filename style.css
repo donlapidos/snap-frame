@@ -107,20 +107,27 @@ h1 {
     height: 100%;
     min-height: 0;
     display: flex;
-    align-items: center;
+    flex-direction: column;
 }
 
-/* Controls wrapper - positions buttons within thumb reach */
+/* Controls bar - separate from preview overlay */
+.controls-bar {
+    flex-shrink: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(20px);
+    padding: 16px;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Controls wrapper - centers buttons horizontally */
 .controls-wrapper {
-    position: absolute;
-    bottom: calc(env(safe-area-inset-bottom) + 20px);
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 10;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 20px;
+    max-width: 500px;
+    margin: 0 auto;
 }
 
 /* Control buttons (flip & fullscreen) - pill-style for text labels */
@@ -180,8 +187,11 @@ h1 {
 .preview-wrapper {
     position: relative;
     width: 100%;
-    max-height: 100%;
-    height: 100%;
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* Loading shimmer overlay */
@@ -219,16 +229,32 @@ h1 {
 #video {
     width: 100%;
     height: 100%;
-    object-fit: contain; /* Changed from cover to contain to show full video without cropping */
-    position: absolute;
-    top: 0;
-    left: 0;
+    object-fit: contain;
+    max-width: 100%;
+    max-height: 100%;
     transform-origin: center center;
+    transition: transform 0.3s ease, object-fit 0.3s ease;
+}
+
+/* Full-bleed mode - Instagram/Snapchat style */
+.preview-wrapper.full-bleed #video {
+    object-fit: cover;
+    transform: scale(1.05);
+}
+
+/* Rotating transition during orientation change */
+.preview-wrapper.rotating #video {
+    transition: transform 0.6s ease;
 }
 
 /* Mirror front-facing cameras only (applied via JavaScript based on facingMode) */
 #video.mirrored {
     transform: scaleX(-1);
+}
+
+/* Mirror + full-bleed */
+.preview-wrapper.full-bleed #video.mirrored {
+    transform: scaleX(-1) scale(1.05);
 }
 
 .overlay-canvas {

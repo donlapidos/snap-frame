@@ -26,21 +26,25 @@
 
         <div id="camera-section">
             <div class="preview-container" id="preview-container">
-                <div class="preview-wrapper">
+                <!-- Full-bleed preview wrapper -->
+                <div class="preview-wrapper" id="preview-wrapper">
                     <video id="video" autoplay playsinline muted></video>
                     <canvas id="overlay-preview" class="overlay-canvas"></canvas>
                 </div>
-                <div class="controls-wrapper">
-                    <button id="flip-camera-btn" class="control-btn" aria-label="Switch camera" disabled>
-                        <span class="btn-label">Flip</span>
-                    </button>
-                    <button id="snap-btn" disabled>
-                        <span id="snap-text">Snap</span>
-                        <span id="snap-loading" class="loading hidden"></span>
-                    </button>
-                    <button id="fullscreen-btn" class="control-btn" aria-label="Toggle fullscreen">
-                        <span class="btn-label">Full</span>
-                    </button>
+                <!-- Bottom controls bar (outside overlay plane) -->
+                <div class="controls-bar">
+                    <div class="controls-wrapper">
+                        <button id="flip-camera-btn" class="control-btn" aria-label="Switch camera" disabled>
+                            <span class="btn-label">Flip</span>
+                        </button>
+                        <button id="snap-btn" disabled>
+                            <span id="snap-text">Snap</span>
+                            <span id="snap-loading" class="loading hidden"></span>
+                        </button>
+                        <button id="fullscreen-btn" class="control-btn" aria-label="Toggle fullscreen">
+                            <span class="btn-label">Full</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
