@@ -5,32 +5,14 @@ const USE_SVG = true; // Set to false to use PNG overlays instead
 function getCanvasDimensions() {
     // Use actual video dimensions when available
     if (video.videoWidth > 0 && video.videoHeight > 0) {
-        const aspectRatio = video.videoWidth / video.videoHeight;
-
-        // Cap to 1080×1920 for performance and battery
-        const MAX_WIDTH = 1080;
-        const MAX_HEIGHT = 1920;
-
-        let width, height;
-
-        if (aspectRatio > 1) {
-            // Landscape: cap width to 1920, calculate height
-            width = Math.min(video.videoWidth, MAX_HEIGHT);
-            height = Math.round(width / aspectRatio);
-        } else {
-            // Portrait: cap height to 1920, calculate width
-            height = Math.min(video.videoHeight, MAX_HEIGHT);
-            width = Math.round(height * aspectRatio);
-        }
-
+        // Use video dimensions directly, capped to reasonable max
+        const maxDim = 1920;
+        const width = Math.min(video.videoWidth, maxDim);
+        const height = Math.min(video.videoHeight, maxDim);
         return { width, height };
     }
-    // Fallback: portrait default
-    const angle = getCurrentOrientation();
-    const isLandscape = (angle === 90 || angle === -90 || angle === 270);
-    return isLandscape
-        ? { width: 1920, height: 1080 }
-        : { width: 1080, height: 1920 };
+    // Fallback: portrait default for mobile-first
+    return { width: 1080, height: 1920 };
 }
 
 let CANVAS_WIDTH = 1080;
@@ -61,7 +43,6 @@ const errorMessage = document.getElementById('error-message');
 const overlayPreview = document.getElementById('overlay-preview');
 const previewWrapper = document.querySelector('.preview-wrapper');
 const previewContainer = document.getElementById('preview-container');
-const fullscreenBtn = document.getElementById('fullscreen-btn');
 const flipCameraBtn = document.getElementById('flip-camera-btn');
 const toastContainer = document.getElementById('toast-container');
 
@@ -176,21 +157,13 @@ async function initCamera(facingMode = currentFacingMode) {
         // Track current orientation
         lastOrientationAngle = getCurrentOrientation();
 
-        // Determine orientation - treat portrait as default
-        const angle = getCurrentOrientation();
-        const isLandscape = (angle === 90 || angle === -90 || angle === 270);
-
-        // Cap resolution to 1080×1920 for performance and battery life
-        const MAX_WIDTH = 1080;
-        const MAX_HEIGHT = 1920;
-
+        // Simple constraints - let the browser handle orientation naturally
+        // Request portrait dimensions for mobile-first approach
         const constraints = {
             video: {
                 facingMode: facingMode,
-                // Portrait default: 1080×1920, Landscape: 1920×1080
-                width: { ideal: isLandscape ? MAX_HEIGHT : MAX_WIDTH, max: MAX_HEIGHT },
-                height: { ideal: isLandscape ? MAX_WIDTH : MAX_HEIGHT, max: MAX_HEIGHT },
-                aspectRatio: { ideal: isLandscape ? 16/9 : 9/16 }
+                width: { ideal: 1080 },
+                height: { ideal: 1920 }
             }
         };
 
@@ -562,62 +535,10 @@ function retryCamera() {
 // Detect iOS
 function isIOS() {
     return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-           (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
-// Check if fullscreen API is supported
-function isFullscreenSupported() {
-    return !!(
-        document.fullscreenEnabled ||
-        document.webkitFullscreenEnabled ||
-        document.mozFullScreenEnabled ||
-        document.msFullscreenEnabled
-    );
-}
 
-// Initialize fullscreen button visibility
-function initFullscreenButton() {
-    if (isIOS() || !isFullscreenSupported()) {
-        // Hide fullscreen button on iOS (rely on immersive viewport)
-        fullscreenBtn.style.display = 'none';
-        console.log('iOS detected or Fullscreen API not supported - button hidden, using immersive viewport');
-    } else {
-        // Keep button visible on Android and other platforms
-        fullscreenBtn.style.display = '';
-        console.log('Fullscreen button enabled');
-    }
-}
-
-// Toggle fullscreen preview (only called on platforms where button is visible)
-function toggleFullscreen() {
-    if (!document.fullscreenElement && !document.webkitFullscreenElement &&
-        !document.mozFullScreenElement && !document.msFullscreenElement) {
-        // Enter fullscreen
-        if (previewContainer.requestFullscreen) {
-            previewContainer.requestFullscreen();
-        } else if (previewContainer.webkitRequestFullscreen) {
-            // Safari (desktop)
-            previewContainer.webkitRequestFullscreen();
-        } else if (previewContainer.mozRequestFullScreen) {
-            // Firefox
-            previewContainer.mozRequestFullScreen();
-        } else if (previewContainer.msRequestFullscreen) {
-            // IE/Edge
-            previewContainer.msRequestFullscreen();
-        }
-    } else {
-        // Exit fullscreen
-        if (document.exitFullscreen) {
-            document.exitFullscreen();
-        } else if (document.webkitExitFullscreen) {
-            document.webkitExitFullscreen();
-        } else if (document.mozCancelFullScreen) {
-            document.mozCancelFullScreen();
-        } else if (document.msExitFullscreen) {
-            document.msExitFullscreen();
-        }
-    }
-}
 
 // Flip camera with optimized approach
 async function flipCamera() {
@@ -695,7 +616,6 @@ snapBtn.addEventListener('click', snapPhoto);
 downloadBtn.addEventListener('click', downloadPhoto);
 document.getElementById('retake-btn').addEventListener('click', retakePhoto);
 document.getElementById('retry-btn').addEventListener('click', retryCamera);
-fullscreenBtn.addEventListener('click', toggleFullscreen);
 flipCameraBtn.addEventListener('click', flipCamera);
 
 // Handle orientation change - restart stream with new constraints
@@ -792,6 +712,5 @@ window.addEventListener('beforeunload', () => {
 });
 
 // Initialize on page load
-initFullscreenButton();
 initFlipButton();
 window.addEventListener('load', () => initCamera());
