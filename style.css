@@ -42,22 +42,10 @@ body {
     overflow: hidden;
 }
 
-h1 {
-    color: #fff;
-    font-size: clamp(1.4rem, 4vw, 2.2rem);
-    font-weight: 800;
-    letter-spacing: -0.5px;
-    position: absolute;
-    top: calc(env(safe-area-inset-top) + 12px);
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 10;
-}
-
 /* Toast notifications */
 .toast-container {
     position: fixed;
-    top: calc(env(safe-area-inset-top) + 60px);
+    top: calc(env(safe-area-inset-top) + 12px);
     left: 50%;
     transform: translateX(-50%);
     z-index: 1000;
@@ -327,13 +315,6 @@ h1 {
     display: flex;
 }
 
-.result-section h2 {
-    font-size: 1.5rem;
-    margin-bottom: 18px;
-    color: #fff;
-    font-weight: 700;
-}
-
 #result-preview {
     max-width: min(90vw, 600px);
     width: 100%;
@@ -519,11 +500,6 @@ h1 {
         height: 100%;
     }
 
-    h1 {
-        font-size: 1.8rem;
-        margin-bottom: 15px;
-    }
-
     #snap-btn {
         width: 70px;
         height: 70px;
@@ -543,11 +519,6 @@ h1 {
 }
 
 @media (max-height: 700px) {
-    h1 {
-        font-size: 1.7rem;
-        margin-bottom: 12px;
-    }
-
     .container {
         padding: 18px 24px 28px;
     }
