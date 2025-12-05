@@ -204,7 +204,6 @@ async function initCamera(facingMode = currentFacingMode) {
 
         // Enable buttons only after everything is ready
         snapBtn.disabled = false;
-        flipCameraBtn.disabled = false;
 
         // Draw preview overlay
         drawPreviewOverlay();
