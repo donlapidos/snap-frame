@@ -100,14 +100,14 @@ function stopExistingStreams() {
     }
 }
 
-// Update preview wrapper aspect ratio based on actual video dimensions
+// Update preview wrapper - let it flex naturally, no aspect-ratio constraints
 function updatePreviewAspectRatio() {
-    if (video.videoWidth > 0 && video.videoHeight > 0) {
-        // Set aspect ratio to match video dimensions for proper display
-        previewWrapper.style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
-        previewWrapper.style.removeProperty('height');
-        previewWrapper.style.removeProperty('width');
-    }
+    // Remove any inline styles that might have been set
+    previewWrapper.style.removeProperty('aspect-ratio');
+    previewWrapper.style.removeProperty('height');
+    previewWrapper.style.removeProperty('width');
+    // Wrapper stays at flex: 1 with min-height: 70vh from CSS
+    // object-fit: cover on video handles the aspect ratio
 }
 
 // Detect camera facing mode and update mirror state
@@ -789,17 +789,7 @@ window.addEventListener('beforeunload', () => {
     }
 });
 
-// Set initial aspect ratio based on device orientation before camera loads
-// This prevents the preview from jumping between portrait/landscape on load
-function setInitialAspectRatio() {
-    const isDevicePortrait = window.matchMedia('(orientation: portrait)').matches;
-    // Set initial aspect ratio to match device orientation
-    previewWrapper.style.aspectRatio = isDevicePortrait ? '9 / 16' : '16 / 9';
-    console.log('Set initial aspect ratio:', isDevicePortrait ? '9:16 (portrait)' : '16:9 (landscape)');
-}
-
 // Initialize on page load
-setInitialAspectRatio();
 initFullscreenButton();
 initFlipButton();
 window.addEventListener('load', () => initCamera());

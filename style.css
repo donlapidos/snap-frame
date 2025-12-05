@@ -188,6 +188,7 @@ h1 {
     position: relative;
     width: 100%;
     flex: 1;
+    min-height: 70vh;
     overflow: hidden;
     display: flex;
     align-items: center;
