@@ -1,8 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -11,6 +13,7 @@
     <title>Snap & Frame</title>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <div class="container">
         <h1>Snap & Frame</h1>
@@ -20,7 +23,8 @@
 
         <div class="error-message" id="error-message">
             <h2>Camera Access Needed</h2>
-            <p>Please tap "Allow" when prompted for camera permission. If you've denied access, go to your phone's Settings app to enable camera access for this site.</p>
+            <p>Please tap "Allow" when prompted for camera permission. If you've denied access, go to your phone's
+                Settings app to enable camera access for this site.</p>
             <button id="retry-btn">Retry Camera Access</button>
         </div>
 
@@ -34,9 +38,6 @@
                 <!-- Bottom controls bar (outside overlay plane) -->
                 <div class="controls-bar">
                     <div class="controls-wrapper">
-                        <button id="flip-camera-btn" class="control-btn" aria-label="Switch camera" disabled>
-                            <span class="btn-label">Flip</span>
-                        </button>
                         <button id="snap-btn" disabled>
                             <span id="snap-text">Snap</span>
                             <span id="snap-loading" class="loading hidden"></span>
@@ -58,4 +59,5 @@
 
     <script src="script.js"></script>
 </body>
+
 </html>

@@ -238,27 +238,10 @@ h1 {
     object-fit: contain;
     max-width: 100%;
     max-height: 100%;
-    transform-origin: center center;
-    transition: transform 0.3s ease, object-fit 0.3s ease;
-}
-
-/* Full-bleed mode - fill the preview area */
-.preview-wrapper.full-bleed #video {
-    object-fit: cover;
-}
-
-/* Rotating transition during orientation change */
-.preview-wrapper.rotating #video {
-    transition: transform 0.3s ease;
 }
 
 /* Mirror front-facing cameras only (applied via JavaScript based on facingMode) */
 #video.mirrored {
-    transform: scaleX(-1);
-}
-
-/* Mirror + full-bleed - no extra zoom */
-.preview-wrapper.full-bleed #video.mirrored {
     transform: scaleX(-1);
 }
 

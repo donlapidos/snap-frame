@@ -43,7 +43,6 @@ const errorMessage = document.getElementById('error-message');
 const overlayPreview = document.getElementById('overlay-preview');
 const previewWrapper = document.querySelector('.preview-wrapper');
 const previewContainer = document.getElementById('preview-container');
-const flipCameraBtn = document.getElementById('flip-camera-btn');
 const toastContainer = document.getElementById('toast-container');
 
 let stream = null;
@@ -192,11 +191,6 @@ async function initCamera(facingMode = currentFacingMode) {
 
         // Detect camera facing mode and update mirror state
         updateCameraMirrorState();
-
-        // Enable full-bleed mode immediately (ensures it's always applied after initCamera)
-        // Remove any temporary rotation class and add full-bleed
-        previewWrapper.classList.remove('rotating');
-        previewWrapper.classList.add('full-bleed');
 
         // Load overlay assets only if ALL are already cached
         const overlayKeys = USE_SVG
@@ -539,79 +533,11 @@ function isIOS() {
 }
 
 
-
-// Flip camera with optimized approach
-async function flipCamera() {
-    if (!stream) return;
-
-    // Disable button during flip
-    flipCameraBtn.disabled = true;
-    previewWrapper.classList.add('loading');
-
-    try {
-        const videoTrack = stream.getVideoTracks()[0];
-        if (!videoTrack) {
-            throw new Error('No video track available');
-        }
-
-        // Determine new facing mode
-        const newFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
-
-        // Try optimized approach: applyConstraints (no stream restart)
-        try {
-            await videoTrack.applyConstraints({
-                facingMode: { exact: newFacingMode }
-            });
-
-            // Success - update state (no persistence per spec requirements)
-            currentFacingMode = newFacingMode;
-            updateCameraMirrorState();
-            updatePreviewAspectRatio();
-            drawPreviewOverlay();
-
-            console.log('Camera flipped using applyConstraints to', newFacingMode);
-        } catch (constraintError) {
-            // applyConstraints failed, fall back to full reinitialization
-            console.log('applyConstraints failed, reinitializing camera:', constraintError.message);
-
-            // Full reinitialization
-            await initCamera(newFacingMode);
-        }
-    } catch (error) {
-        console.error('Camera flip error:', error.name);
-        showToast('Failed to switch camera. Please try again.');
-    } finally {
-        // Re-enable button
-        flipCameraBtn.disabled = false;
-        previewWrapper.classList.remove('loading');
-    }
-}
-
-// Check available cameras and hide flip button if only one
-async function initFlipButton() {
-    try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices.filter(device => device.kind === 'videoinput');
-
-        if (videoDevices.length <= 1) {
-            // Hide flip button if only one camera
-            flipCameraBtn.style.display = 'none';
-            console.log('Only one camera available - flip button hidden');
-        } else {
-            flipCameraBtn.style.display = '';
-        }
-    } catch (error) {
-        console.log('Could not enumerate devices:', error);
-        // Keep button visible by default if we can't check
-    }
-}
-
 // Event listeners
 snapBtn.addEventListener('click', snapPhoto);
 downloadBtn.addEventListener('click', downloadPhoto);
 document.getElementById('retake-btn').addEventListener('click', retakePhoto);
 document.getElementById('retry-btn').addEventListener('click', retryCamera);
-flipCameraBtn.addEventListener('click', flipCamera);
 
 // Handle orientation change - restart stream with new constraints
 let orientationTimeout;
@@ -707,5 +633,4 @@ window.addEventListener('beforeunload', () => {
 });
 
 // Initialize on page load
-initFlipButton();
 window.addEventListener('load', () => initCamera());
