@@ -4,28 +4,34 @@
     box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
     height: 100%;
-    height: 100dvh; /* Dynamic viewport height for mobile */
+    height: 100dvh;
+    /* Dynamic viewport height for mobile */
 }
 
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: #000; /* Match container background */
+    background: #000;
+    /* Match container background */
     min-height: 100vh;
-    min-height: 100dvh; /* Dynamic viewport for mobile browsers */
+    min-height: 100dvh;
+    /* Dynamic viewport for mobile browsers */
     display: flex;
     justify-content: center;
     align-items: stretch;
     padding: 0;
     margin: 0;
-    overflow: hidden; /* Prevent unwanted scroll */
+    overflow: hidden;
+    /* Prevent unwanted scroll */
 }
 
 .container {
     width: 100%;
     height: 100%;
-    height: 100dvh; /* Dynamic viewport height */
+    height: 100dvh;
+    /* Dynamic viewport height */
     min-height: 100vh;
     min-height: 100dvh;
     background: #000;
@@ -87,6 +93,7 @@ h1 {
         opacity: 0;
         transform: translateY(-20px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -136,28 +143,28 @@ h1 {
     margin: 0 auto;
 }
 
-/* Control buttons (flip & fullscreen) - pill-style for text labels */
+/* Control buttons - circular style matching snap button */
 .control-btn {
-    background: rgba(0, 0, 0, 0.6);
-    border: 2px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid rgba(255, 255, 255, 0.2);
     color: white;
-    min-width: 64px;
-    min-height: 48px;
-    height: 48px;
-    padding: 0 16px;
-    border-radius: 24px;
-    font-size: 0.75rem;
+    width: 56px;
+    height: 56px;
+    min-width: 56px;
+    min-height: 56px;
+    border-radius: 50%;
+    font-size: 0.7rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.3px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.2s ease;
-    backdrop-filter: blur(10px);
     -webkit-tap-highlight-color: transparent;
     flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .control-btn .btn-label {
@@ -181,15 +188,6 @@ h1 {
     cursor: not-allowed;
 }
 
-#flip-camera-btn.flipping {
-    animation: flip-spin 0.6s ease;
-}
-
-@keyframes flip-spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
 .preview-wrapper {
     position: relative;
     width: 100%;
@@ -210,9 +208,9 @@ h1 {
     width: 100%;
     height: 100%;
     background: linear-gradient(90deg,
-        transparent 0%,
-        rgba(255, 255, 255, 0.1) 50%,
-        transparent 100%);
+            transparent 0%,
+            rgba(255, 255, 255, 0.1) 50%,
+            transparent 100%);
     z-index: 5;
     pointer-events: none;
     opacity: 0;
@@ -228,6 +226,7 @@ h1 {
     0% {
         left: -100%;
     }
+
     100% {
         left: 100%;
     }
@@ -243,15 +242,14 @@ h1 {
     transition: transform 0.3s ease, object-fit 0.3s ease;
 }
 
-/* Full-bleed mode - Instagram/Snapchat style */
+/* Full-bleed mode - fill the preview area */
 .preview-wrapper.full-bleed #video {
     object-fit: cover;
-    transform: scale(1.05);
 }
 
 /* Rotating transition during orientation change */
 .preview-wrapper.rotating #video {
-    transition: transform 0.6s ease;
+    transition: transform 0.3s ease;
 }
 
 /* Mirror front-facing cameras only (applied via JavaScript based on facingMode) */
@@ -259,9 +257,9 @@ h1 {
     transform: scaleX(-1);
 }
 
-/* Mirror + full-bleed */
+/* Mirror + full-bleed - no extra zoom */
 .preview-wrapper.full-bleed #video.mirrored {
-    transform: scaleX(-1) scale(1.05);
+    transform: scaleX(-1);
 }
 
 .overlay-canvas {
@@ -368,6 +366,7 @@ h1 {
         opacity: 0;
         transform: translateY(10px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -383,7 +382,8 @@ h1 {
     flex-shrink: 0;
 }
 
-#download-btn, #retake-btn {
+#download-btn,
+#retake-btn {
     border: none;
     padding: 14px 32px;
     border-radius: 50px;
@@ -398,7 +398,8 @@ h1 {
     overflow: hidden;
 }
 
-#download-btn::before, #retake-btn::before {
+#download-btn::before,
+#retake-btn::before {
     content: '';
     position: absolute;
     top: 50%;
@@ -411,7 +412,8 @@ h1 {
     transition: width 0.6s, height 0.6s;
 }
 
-#download-btn:hover::before, #retake-btn:hover::before {
+#download-btn:hover::before,
+#retake-btn:hover::before {
     width: 300px;
     height: 300px;
 }
@@ -507,7 +509,9 @@ h1 {
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .hidden {
@@ -524,7 +528,8 @@ h1 {
     .preview-container {
         width: 100%;
         max-width: 100vw;
-        border-radius: 0; /* No rounded corners on mobile for full-bleed */
+        border-radius: 0;
+        /* No rounded corners on mobile for full-bleed */
         height: 100%;
     }
 
@@ -539,7 +544,8 @@ h1 {
         margin-top: 15px;
     }
 
-    #download-btn, #retake-btn {
+    #download-btn,
+    #retake-btn {
         min-width: 130px;
         padding: 12px 24px;
         font-size: 0.95rem;

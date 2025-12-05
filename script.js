@@ -544,9 +544,8 @@ function isIOS() {
 async function flipCamera() {
     if (!stream) return;
 
-    // Disable button and show loading shimmer during flip
+    // Disable button during flip
     flipCameraBtn.disabled = true;
-    flipCameraBtn.classList.add('flipping');
     previewWrapper.classList.add('loading');
 
     try {
@@ -582,13 +581,9 @@ async function flipCamera() {
         console.error('Camera flip error:', error.name);
         showToast('Failed to switch camera. Please try again.');
     } finally {
-        // Re-enable button and remove animation classes
+        // Re-enable button
         flipCameraBtn.disabled = false;
         previewWrapper.classList.remove('loading');
-        // Delay removing class to ensure animation completes
-        setTimeout(() => {
-            flipCameraBtn.classList.remove('flipping');
-        }, 600);
     }
 }
 
