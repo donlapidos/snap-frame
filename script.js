@@ -1,23 +1,6 @@
 // Configuration
 const USE_SVG = true; // Set to false to use PNG overlays instead
 
-// Get canvas dimensions based on actual video stream
-function getCanvasDimensions() {
-    // Use actual video dimensions when available
-    if (video.videoWidth > 0 && video.videoHeight > 0) {
-        // Use video dimensions directly, capped to reasonable max
-        const maxDim = 1920;
-        const width = Math.min(video.videoWidth, maxDim);
-        const height = Math.min(video.videoHeight, maxDim);
-        return { width, height };
-    }
-    // Fallback: portrait default for mobile-first
-    return { width: 1080, height: 1920 };
-}
-
-let CANVAS_WIDTH = 1080;
-let CANVAS_HEIGHT = 1920;
-
 // Asset paths
 const ASSETS = {
     logo_rrc: 'assets/Asset 2.svg',
@@ -49,8 +32,7 @@ let stream = null;
 let overlayImages = {};
 let currentPhotoURL = null; // Store current photo URL for cleanup
 let shouldMirrorCamera = true; // Track if current camera should be mirrored (true for front camera)
-let currentFacingMode = 'user'; // Default to front camera (compliant with no-persistence requirement)
-let lastOrientationAngle = null; // Track last orientation to detect real changes
+let currentFacingMode = 'user'; // Default to front camera
 let isLoadingCamera = false; // Prevent concurrent camera initializations
 let orientationMQ = null; // Store MediaQueryList reference for proper cleanup
 
@@ -78,16 +60,6 @@ function stopExistingStreams() {
         video.srcObject.getTracks().forEach(track => track.stop());
         video.srcObject = null;
     }
-}
-
-// Update preview wrapper - let it flex naturally, no aspect-ratio constraints
-function updatePreviewAspectRatio() {
-    // Remove any inline styles that might have been set
-    previewWrapper.style.removeProperty('aspect-ratio');
-    previewWrapper.style.removeProperty('height');
-    previewWrapper.style.removeProperty('width');
-    // Wrapper stays at flex: 1 with min-height: 70vh from CSS
-    // object-fit: cover on video handles the aspect ratio
 }
 
 // Detect camera facing mode and update mirror state
@@ -122,16 +94,6 @@ function updateCameraMirrorState() {
     console.log('Camera facing mode:', facingMode, 'Label:', trackLabel, '- Mirror:', shouldMirrorCamera);
 }
 
-// Get current orientation angle (cross-browser)
-function getCurrentOrientation() {
-    if (screen.orientation && screen.orientation.angle !== undefined) {
-        return screen.orientation.angle;
-    } else if (window.orientation !== undefined) {
-        return window.orientation;
-    }
-    return 0; // Fallback
-}
-
 // Initialize camera
 async function initCamera(facingMode = currentFacingMode) {
     try {
@@ -152,9 +114,6 @@ async function initCamera(facingMode = currentFacingMode) {
 
         // Small delay to ensure camera is released
         await new Promise(resolve => setTimeout(resolve, 100));
-
-        // Track current orientation
-        lastOrientationAngle = getCurrentOrientation();
 
         // Simple constraints - let the browser handle orientation naturally
         // Request portrait dimensions for mobile-first approach
@@ -185,9 +144,6 @@ async function initCamera(facingMode = currentFacingMode) {
                 };
             });
         }
-
-        // Update preview aspect ratio to match actual video
-        updatePreviewAspectRatio();
 
         // Detect camera facing mode and update mirror state
         updateCameraMirrorState();
@@ -261,17 +217,12 @@ function drawPreviewOverlay() {
     const canvas = overlayPreview;
     const ctx = canvas.getContext('2d');
 
-    // Set canvas size to match container
+    // Set canvas size to match container (which has 9:16 aspect ratio from CSS)
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width;
     canvas.height = rect.height;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Update canvas dimensions based on actual video
-    const dims = getCanvasDimensions();
-    CANVAS_WIDTH = dims.width;
-    CANVAS_HEIGHT = dims.height;
 
     // Calculate scaling based on canvas display width
     // Use canvas.width (display size) divided by 1080 as base reference
@@ -292,14 +243,14 @@ function drawPreviewOverlay() {
         const logoWidth = 350 * scale;
         const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
         const logoX = (canvas.width - logoWidth) / 2; // Center horizontally
-        const logoY = 100 * scale; // Lowered from 50 to 100
+        const logoY = 100 * scale;
         ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
     }
 
     // 3. Draw event text (bottom left - Asset 3)
     if (overlayImages.text_event || overlayImages.text_event_png) {
         const textImg = overlayImages.text_event || overlayImages.text_event_png;
-        const textWidth = 550 * scale; // Increased size
+        const textWidth = 550 * scale;
         const textHeight = (textImg.height / textImg.width) * textWidth;
         const textX = 80 * scale;
         const textY = canvas.height - textHeight - (120 * scale);
@@ -309,7 +260,7 @@ function drawPreviewOverlay() {
     // 4. Draw 3D box (bottom right - Asset 4)
     if (overlayImages.box_3d || overlayImages.box_3d_png) {
         const boxImg = overlayImages.box_3d || overlayImages.box_3d_png;
-        const boxWidth = 320 * scale; // Increased size significantly
+        const boxWidth = 320 * scale;
         const boxHeight = (boxImg.height / boxImg.width) * boxWidth;
         const boxX = canvas.width - boxWidth - (80 * scale);
         const boxY = canvas.height - boxHeight - (120 * scale);
@@ -333,43 +284,69 @@ async function snapPhoto() {
             });
         }
 
-        // Get actual video dimensions (no rescaling, no cropping)
-        const dims = getCanvasDimensions();
+        // Target portrait aspect ratio (9:16)
+        const targetAspect = 9 / 16;
+        const videoWidth = video.videoWidth;
+        const videoHeight = video.videoHeight;
+        const videoAspect = videoWidth / videoHeight;
+
+        // Calculate crop region to get 9:16 from center of video
+        let sourceX, sourceY, sourceWidth, sourceHeight;
+
+        if (videoAspect > targetAspect) {
+            // Video is wider than target - crop sides (landscape camera)
+            sourceHeight = videoHeight;
+            sourceWidth = videoHeight * targetAspect;
+            sourceX = (videoWidth - sourceWidth) / 2;
+            sourceY = 0;
+        } else {
+            // Video is taller than target - crop top/bottom
+            sourceWidth = videoWidth;
+            sourceHeight = videoWidth / targetAspect;
+            sourceX = 0;
+            sourceY = (videoHeight - sourceHeight) / 2;
+        }
+
+        // Output dimensions - portrait at 1080 width
+        const outputWidth = 1080;
+        const outputHeight = Math.round(outputWidth / targetAspect); // 1920
 
         // Create canvas for final composition
         const canvas = document.createElement('canvas');
-        canvas.width = dims.width;
-        canvas.height = dims.height;
+        canvas.width = outputWidth;
+        canvas.height = outputHeight;
         const ctx = canvas.getContext('2d');
 
-        // Draw video at exact dimensions - no offset calculations needed
-        // since canvas matches video resolution exactly
-        // Mirror only if it's a front-facing camera (to match preview)
+        // Draw cropped video (center crop to match preview)
         ctx.save();
         if (shouldMirrorCamera) {
-            ctx.translate(dims.width, 0);
+            ctx.translate(outputWidth, 0);
             ctx.scale(-1, 1);
         }
-        ctx.drawImage(video, 0, 0, dims.width, dims.height);
+        // Draw the cropped portion of video to fill the canvas
+        ctx.drawImage(video,
+            sourceX, sourceY, sourceWidth, sourceHeight,  // Source crop
+            0, 0, outputWidth, outputHeight               // Destination fill
+        );
         ctx.restore();
 
         // 1. Draw gradient overlay (full background)
         if (overlayImages.gradient || overlayImages.gradient_png) {
             const gradImg = overlayImages.gradient || overlayImages.gradient_png;
             ctx.globalAlpha = 0.8;
-            ctx.drawImage(gradImg, 0, 0, dims.width, dims.height);
+            ctx.drawImage(gradImg, 0, 0, outputWidth, outputHeight);
             ctx.globalAlpha = 1.0;
         }
 
         // Calculate scale factor based on canvas width (relative sizing)
-        const scaleFactor = dims.width / 1080; // Use 1080 as base reference
+        const scaleFactor = outputWidth / 1080; // = 1 for 1080 width
 
         // 2. Draw logos at top center (Asset 2 - both RRC and BEYOND logos)
         if (overlayImages.logo_rrc || overlayImages.logo_rrc_png) {
             const logoImg = overlayImages.logo_rrc || overlayImages.logo_rrc_png;
             const logoWidth = 350 * scaleFactor;
             const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
-            const logoX = (dims.width - logoWidth) / 2; // Center horizontally
+            const logoX = (outputWidth - logoWidth) / 2; // Center horizontally
             const logoY = 100 * scaleFactor;
             ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
         }
@@ -380,7 +357,7 @@ async function snapPhoto() {
             const textWidth = 550 * scaleFactor;
             const textHeight = (textImg.height / textImg.width) * textWidth;
             const textX = 80 * scaleFactor;
-            const textY = dims.height - textHeight - (120 * scaleFactor);
+            const textY = outputHeight - textHeight - (120 * scaleFactor);
             ctx.drawImage(textImg, textX, textY, textWidth, textHeight);
         }
 
@@ -389,8 +366,8 @@ async function snapPhoto() {
             const boxImg = overlayImages.box_3d || overlayImages.box_3d_png;
             const boxWidth = 320 * scaleFactor;
             const boxHeight = (boxImg.height / boxImg.width) * boxWidth;
-            const boxX = dims.width - boxWidth - (80 * scaleFactor);
-            const boxY = dims.height - boxHeight - (120 * scaleFactor);
+            const boxX = outputWidth - boxWidth - (80 * scaleFactor);
+            const boxY = outputHeight - boxHeight - (120 * scaleFactor);
             ctx.drawImage(boxImg, boxX, boxY, boxWidth, boxHeight);
         }
 
@@ -538,45 +515,16 @@ downloadBtn.addEventListener('click', downloadPhoto);
 document.getElementById('retake-btn').addEventListener('click', retakePhoto);
 document.getElementById('retry-btn').addEventListener('click', retryCamera);
 
-// Handle orientation change - restart stream with new constraints
+// Handle orientation change - redraw overlay to fit new dimensions
 let orientationTimeout;
-async function handleOrientationChange() {
+function handleOrientationChange() {
     clearTimeout(orientationTimeout);
-    orientationTimeout = setTimeout(async () => {
-        const newAngle = getCurrentOrientation();
-
-        // Determine orientation types (portrait: 0/180, landscape: ±90)
-        const isPortrait = (angle) => angle === 0 || angle === 180 || angle === -180;
-        const wasPortrait = lastOrientationAngle !== null && isPortrait(lastOrientationAngle);
-        const nowPortrait = isPortrait(newAngle);
-
-        // Only restart if orientation actually changed (portrait <-> landscape)
-        if (lastOrientationAngle !== null && wasPortrait !== nowPortrait) {
-            console.log('Orientation changed from', lastOrientationAngle, 'to', newAngle, '- restarting stream');
-
-            // Show visual feedback
-            showToast('Rotating camera...', 'info', 2000);
-            previewWrapper.classList.add('rotating');
-            previewWrapper.classList.remove('full-bleed');
-
-            // Restart camera with current facing mode to get proper orientation
-            // initCamera will remove 'rotating' class and add 'full-bleed' when done
-            await initCamera(currentFacingMode);
-
-            // Update lastOrientationAngle to track the change
-            lastOrientationAngle = newAngle;
-        } else if (lastOrientationAngle !== newAngle) {
-            // Same orientation type but different angle (e.g., 0° -> 180°)
-            // Just update the preview and redraw overlays
-            updatePreviewAspectRatio();
-            if (overlayImages.logo_rrc || overlayImages.logo_rrc_png) {
-                drawPreviewOverlay();
-            }
-
-            // Update lastOrientationAngle for this case too
-            lastOrientationAngle = newAngle;
+    orientationTimeout = setTimeout(() => {
+        // Redraw overlay to fit new container dimensions
+        if (overlayImages.logo_rrc || overlayImages.logo_rrc_png) {
+            drawPreviewOverlay();
         }
-    }, 300); // Delay to ensure orientation has settled
+    }, 300); // Delay to ensure layout has settled
 }
 
 window.addEventListener('resize', handleOrientationChange);
