@@ -184,11 +184,17 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    /* Force portrait aspect ratio - crop landscape camera to portrait */
+    /* Default: Portrait aspect ratio (9:16) */
     aspect-ratio: 9 / 16;
     max-height: calc(100dvh - 120px);
-    /* Leave room for controls */
     margin: 0 auto;
+}
+
+/* Landscape mode (16:9) */
+.preview-wrapper.landscape {
+    aspect-ratio: 16 / 9;
+    max-width: 100%;
+    max-height: calc(100dvh - 120px);
 }
 
 /* Loading shimmer overlay */

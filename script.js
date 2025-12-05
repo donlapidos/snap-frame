@@ -27,6 +27,7 @@ const overlayPreview = document.getElementById('overlay-preview');
 const previewWrapper = document.querySelector('.preview-wrapper');
 const previewContainer = document.getElementById('preview-container');
 const toastContainer = document.getElementById('toast-container');
+const orientationBtn = document.getElementById('orientation-btn');
 
 let stream = null;
 let overlayImages = {};
@@ -35,6 +36,7 @@ let shouldMirrorCamera = true; // Track if current camera should be mirrored (tr
 let currentFacingMode = 'user'; // Default to front camera
 let isLoadingCamera = false; // Prevent concurrent camera initializations
 let orientationMQ = null; // Store MediaQueryList reference for proper cleanup
+let isLandscapeMode = false; // Default to portrait mode
 
 // Show toast notification (mobile-friendly alternative to alert)
 function showToast(message, type = 'error', duration = 4000) {
@@ -217,16 +219,19 @@ function drawPreviewOverlay() {
     const canvas = overlayPreview;
     const ctx = canvas.getContext('2d');
 
-    // Set canvas size to match container (which has 9:16 aspect ratio from CSS)
+    // Set canvas size to match container
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width;
     canvas.height = rect.height;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Calculate scaling based on canvas display width
-    // Use canvas.width (display size) divided by 1080 as base reference
-    const scale = canvas.width / 1080;
+    // Calculate scaling - use smaller dimension for reference
+    // Portrait: scale by width (1080 base), Landscape: scale by height (1080 base)
+    const baseRef = isLandscapeMode ? 1080 : 1080;
+    const scale = isLandscapeMode
+        ? canvas.height / baseRef
+        : canvas.width / baseRef;
 
     // 1. Draw gradient overlay (full background)
     if (overlayImages.gradient || overlayImages.gradient_png) {
@@ -239,31 +244,30 @@ function drawPreviewOverlay() {
     // 2. Draw logos at top (Asset 2 - contains both RRC and BEYOND logos)
     if (overlayImages.logo_rrc || overlayImages.logo_rrc_png) {
         const logoImg = overlayImages.logo_rrc || overlayImages.logo_rrc_png;
-        // Position at top center with proper sizing
-        const logoWidth = 350 * scale;
+        const logoWidth = (isLandscapeMode ? 250 : 350) * scale;
         const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
-        const logoX = (canvas.width - logoWidth) / 2; // Center horizontally
-        const logoY = 100 * scale;
+        const logoX = (canvas.width - logoWidth) / 2;
+        const logoY = (isLandscapeMode ? 40 : 100) * scale;
         ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
     }
 
     // 3. Draw event text (bottom left - Asset 3)
     if (overlayImages.text_event || overlayImages.text_event_png) {
         const textImg = overlayImages.text_event || overlayImages.text_event_png;
-        const textWidth = 550 * scale;
+        const textWidth = (isLandscapeMode ? 350 : 550) * scale;
         const textHeight = (textImg.height / textImg.width) * textWidth;
-        const textX = 80 * scale;
-        const textY = canvas.height - textHeight - (120 * scale);
+        const textX = (isLandscapeMode ? 40 : 80) * scale;
+        const textY = canvas.height - textHeight - ((isLandscapeMode ? 40 : 120) * scale);
         ctx.drawImage(textImg, textX, textY, textWidth, textHeight);
     }
 
     // 4. Draw 3D box (bottom right - Asset 4)
     if (overlayImages.box_3d || overlayImages.box_3d_png) {
         const boxImg = overlayImages.box_3d || overlayImages.box_3d_png;
-        const boxWidth = 320 * scale;
+        const boxWidth = (isLandscapeMode ? 200 : 320) * scale;
         const boxHeight = (boxImg.height / boxImg.width) * boxWidth;
-        const boxX = canvas.width - boxWidth - (80 * scale);
-        const boxY = canvas.height - boxHeight - (120 * scale);
+        const boxX = canvas.width - boxWidth - ((isLandscapeMode ? 40 : 80) * scale);
+        const boxY = canvas.height - boxHeight - ((isLandscapeMode ? 40 : 120) * scale);
         ctx.drawImage(boxImg, boxX, boxY, boxWidth, boxHeight);
     }
 }
@@ -284,17 +288,17 @@ async function snapPhoto() {
             });
         }
 
-        // Target portrait aspect ratio (9:16)
-        const targetAspect = 9 / 16;
+        // Target aspect ratio based on current mode
+        const targetAspect = isLandscapeMode ? (16 / 9) : (9 / 16);
         const videoWidth = video.videoWidth;
         const videoHeight = video.videoHeight;
         const videoAspect = videoWidth / videoHeight;
 
-        // Calculate crop region to get 9:16 from center of video
+        // Calculate crop region to match preview
         let sourceX, sourceY, sourceWidth, sourceHeight;
 
         if (videoAspect > targetAspect) {
-            // Video is wider than target - crop sides (landscape camera)
+            // Video is wider than target - crop sides
             sourceHeight = videoHeight;
             sourceWidth = videoHeight * targetAspect;
             sourceX = (videoWidth - sourceWidth) / 2;
@@ -307,9 +311,15 @@ async function snapPhoto() {
             sourceY = (videoHeight - sourceHeight) / 2;
         }
 
-        // Output dimensions - portrait at 1080 width
-        const outputWidth = 1080;
-        const outputHeight = Math.round(outputWidth / targetAspect); // 1920
+        // Output dimensions based on mode
+        let outputWidth, outputHeight;
+        if (isLandscapeMode) {
+            outputWidth = 1920;
+            outputHeight = 1080;
+        } else {
+            outputWidth = 1080;
+            outputHeight = 1920;
+        }
 
         // Create canvas for final composition
         const canvas = document.createElement('canvas');
@@ -338,36 +348,38 @@ async function snapPhoto() {
             ctx.globalAlpha = 1.0;
         }
 
-        // Calculate scale factor based on canvas width (relative sizing)
-        const scaleFactor = outputWidth / 1080; // = 1 for 1080 width
+        // Calculate scale factor - landscape uses height, portrait uses width
+        const scaleFactor = isLandscapeMode
+            ? outputHeight / 1080
+            : outputWidth / 1080;
 
         // 2. Draw logos at top center (Asset 2 - both RRC and BEYOND logos)
         if (overlayImages.logo_rrc || overlayImages.logo_rrc_png) {
             const logoImg = overlayImages.logo_rrc || overlayImages.logo_rrc_png;
-            const logoWidth = 350 * scaleFactor;
+            const logoWidth = (isLandscapeMode ? 250 : 350) * scaleFactor;
             const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
-            const logoX = (outputWidth - logoWidth) / 2; // Center horizontally
-            const logoY = 100 * scaleFactor;
+            const logoX = (outputWidth - logoWidth) / 2;
+            const logoY = (isLandscapeMode ? 40 : 100) * scaleFactor;
             ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
         }
 
         // 3. Draw event text at bottom left (Asset 3)
         if (overlayImages.text_event || overlayImages.text_event_png) {
             const textImg = overlayImages.text_event || overlayImages.text_event_png;
-            const textWidth = 550 * scaleFactor;
+            const textWidth = (isLandscapeMode ? 350 : 550) * scaleFactor;
             const textHeight = (textImg.height / textImg.width) * textWidth;
-            const textX = 80 * scaleFactor;
-            const textY = outputHeight - textHeight - (120 * scaleFactor);
+            const textX = (isLandscapeMode ? 40 : 80) * scaleFactor;
+            const textY = outputHeight - textHeight - ((isLandscapeMode ? 40 : 120) * scaleFactor);
             ctx.drawImage(textImg, textX, textY, textWidth, textHeight);
         }
 
         // 4. Draw 3D box at bottom right (Asset 4)
         if (overlayImages.box_3d || overlayImages.box_3d_png) {
             const boxImg = overlayImages.box_3d || overlayImages.box_3d_png;
-            const boxWidth = 320 * scaleFactor;
+            const boxWidth = (isLandscapeMode ? 200 : 320) * scaleFactor;
             const boxHeight = (boxImg.height / boxImg.width) * boxWidth;
-            const boxX = outputWidth - boxWidth - (80 * scaleFactor);
-            const boxY = outputHeight - boxHeight - (120 * scaleFactor);
+            const boxX = outputWidth - boxWidth - ((isLandscapeMode ? 40 : 80) * scaleFactor);
+            const boxY = outputHeight - boxHeight - ((isLandscapeMode ? 40 : 120) * scaleFactor);
             ctx.drawImage(boxImg, boxX, boxY, boxWidth, boxHeight);
         }
 
@@ -508,12 +520,29 @@ function isIOS() {
         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
+// Toggle between portrait and landscape mode
+function toggleOrientation() {
+    isLandscapeMode = !isLandscapeMode;
+
+    // Update CSS class on preview wrapper
+    if (isLandscapeMode) {
+        previewWrapper.classList.add('landscape');
+    } else {
+        previewWrapper.classList.remove('landscape');
+    }
+
+    // Redraw overlay to fit new dimensions
+    setTimeout(() => {
+        drawPreviewOverlay();
+    }, 100); // Small delay for CSS transition
+}
 
 // Event listeners
 snapBtn.addEventListener('click', snapPhoto);
 downloadBtn.addEventListener('click', downloadPhoto);
 document.getElementById('retake-btn').addEventListener('click', retakePhoto);
 document.getElementById('retry-btn').addEventListener('click', retryCamera);
+orientationBtn.addEventListener('click', toggleOrientation);
 
 // Handle orientation change - redraw overlay to fit new dimensions
 let orientationTimeout;
