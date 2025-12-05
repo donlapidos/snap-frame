@@ -220,10 +220,10 @@ async function initCamera(facingMode = currentFacingMode) {
         // Detect camera facing mode and update mirror state
         updateCameraMirrorState();
 
-        // Enable full-bleed mode after orientation stabilizes
-        setTimeout(() => {
-            previewWrapper.classList.add('full-bleed');
-        }, 300);
+        // Enable full-bleed mode immediately (ensures it's always applied after initCamera)
+        // Remove any temporary rotation class and add full-bleed
+        previewWrapper.classList.remove('rotating');
+        previewWrapper.classList.add('full-bleed');
 
         // Load overlay assets only if ALL are already cached
         const overlayKeys = USE_SVG
@@ -720,12 +720,11 @@ async function handleOrientationChange() {
             previewWrapper.classList.remove('full-bleed');
 
             // Restart camera with current facing mode to get proper orientation
+            // initCamera will remove 'rotating' class and add 'full-bleed' when done
             await initCamera(currentFacingMode);
 
-            // Remove rotating class after transition
-            setTimeout(() => {
-                previewWrapper.classList.remove('rotating');
-            }, 600);
+            // Update lastOrientationAngle to track the change
+            lastOrientationAngle = newAngle;
         } else if (lastOrientationAngle !== newAngle) {
             // Same orientation type but different angle (e.g., 0° -> 180°)
             // Just update the preview and redraw overlays
@@ -733,6 +732,9 @@ async function handleOrientationChange() {
             if (overlayImages.logo_rrc || overlayImages.logo_rrc_png) {
                 drawPreviewOverlay();
             }
+
+            // Update lastOrientationAngle for this case too
+            lastOrientationAngle = newAngle;
         }
     }, 300); // Delay to ensure orientation has settled
 }
