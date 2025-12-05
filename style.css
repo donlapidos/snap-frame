@@ -6,22 +6,28 @@
 
 html, body {
     height: 100%;
+    height: 100dvh; /* Dynamic viewport height for mobile */
 }
 
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: #e6ebef;
+    background: #000; /* Match container background */
     min-height: 100vh;
+    min-height: 100dvh; /* Dynamic viewport for mobile browsers */
     display: flex;
     justify-content: center;
     align-items: stretch;
     padding: 0;
     margin: 0;
+    overflow: hidden; /* Prevent unwanted scroll */
 }
 
 .container {
     width: 100%;
+    height: 100%;
+    height: 100dvh; /* Dynamic viewport height */
     min-height: 100vh;
+    min-height: 100dvh;
     background: #000;
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     position: relative;
@@ -511,14 +517,15 @@ h1 {
 /* Responsive improvements */
 @media (max-width: 480px) {
     .container {
-        padding: 20px 16px 28px;
+        /* Only safe area padding, no extra padding that takes away from viewport */
+        padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     }
 
     .preview-container {
         width: 100%;
         max-width: 100vw;
-        border-radius: 12px;
-        height: auto;
+        border-radius: 0; /* No rounded corners on mobile for full-bleed */
+        height: 100%;
     }
 
     h1 {
